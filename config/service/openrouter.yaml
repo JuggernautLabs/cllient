@@ -1,0 +1,90 @@
+service:
+  name: OpenRouter
+  base_url: https://openrouter.ai
+
+http:
+  request: |
+    POST /api/v1/chat/completions HTTP/1.1
+    Host: openrouter.ai
+    Content-Type: application/json
+    Authorization: Bearer ${OPEN_ROUTER_API_KEY}
+    HTTP-Referer: ${HTTP_REFERER}
+    X-Title: ${X_TITLE}
+
+    {
+      "model": "{{model_id}}",
+      "messages": {{json messages}},
+      "temperature": {{temperature}},
+      "max_tokens": {{max_tokens}},
+      "stream": {{stream}}
+    }
+
+# Optional fields that can be injected based on capabilities
+optional:
+  json_mode: |
+    ,
+    "response_format": {"type": "json_object"}
+  tools: |
+    ,
+    "tools": ${tools},
+    "tool_choice": ${tool_choice}
+  functions: |
+    ,
+    "functions": ${functions},
+    "function_call": ${function_call}
+  top_p: |
+    ,
+    "top_p": {{top_p}}
+  frequency_penalty: |
+    ,
+    "frequency_penalty": {{frequency_penalty}}
+  presence_penalty: |
+    ,
+    "presence_penalty": {{presence_penalty}}
+
+streaming:
+  format: text/event-stream
+  parser: openai_sse
+  line_prefix: "data: "
+  done_marker: "[DONE]"
+  events:
+    - type: data
+      extract: choices[0].delta.content
+      action: content
+      filter: choices[0].delta.content
+    - type: data
+      extract: choices[0].delta.role
+      action: role_start
+      filter: choices[0].delta.role
+    - type: data
+      extract: choices[0].finish_reason
+      action: finish
+      filter: choices[0].finish_reason
+    - type: data
+      extract: choices[0].delta.function_call
+      action: function_call
+      filter: choices[0].delta.function_call
+
+response:
+  success_codes: [200]
+  extract:
+    content: choices[0].message.content
+    role: choices[0].message.role
+    finish_reason: choices[0].finish_reason
+    usage:
+      input: usage.prompt_tokens
+      output: usage.completion_tokens
+      total: usage.total_tokens
+  error:
+    message: error.message
+    type: error.type
+    code: error.code
+    param: error.param
+
+message_builder: openai
+
+# Rate limiting (OpenRouter aggregates multiple providers)
+rate_limits:
+  requests_per_minute: 200
+  tokens_per_minute: 40000
+  concurrent_requests: 10

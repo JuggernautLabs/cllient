@@ -1,0 +1,21 @@
+model:
+  id: gemma-3-12b-it
+  name: "Google: Gemma 3 12B"
+  lab: google
+  family: gemma
+  service: google
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 131072
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.000029999999999999997
+  output_per_1k_tokens: 0.00009999999999999999

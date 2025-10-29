@@ -1,0 +1,21 @@
+model:
+  id: llama-3.2-3b-instruct
+  name: "Meta: Llama 3.2 3B Instruct"
+  lab: meta-llama
+  family: llama
+  service: openrouter
+
+capabilities:
+  context_window: 16384
+  max_output_tokens: 16384
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00002
+  output_per_1k_tokens: 0.00002

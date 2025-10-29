@@ -1,0 +1,29 @@
+model:
+  id: claude-3-sonnet-20240229
+  family: claude
+  name: Claude 3 Sonnet
+  version: "3"
+  variant: sonnet
+  service: anthropic
+
+  status: not_found
+capabilities:
+  context_window: 200000
+  max_output_tokens: 4096
+  vision: true
+  functions: true
+  streaming: true
+  json_mode: false
+  system_prompt: true
+  multimodal: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.003
+  output_per_1k_tokens: 0.015
+  cached_input_per_1k_tokens: 0.0015
+
+defaults:
+  temperature: 1.0
+  max_tokens: 4096
+  top_p: 1.0

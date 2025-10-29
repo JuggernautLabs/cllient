@@ -1,0 +1,21 @@
+model:
+  id: andromeda-alpha
+  name: "Andromeda Alpha"
+  lab: openrouter
+  family: andromeda
+  service: openrouter
+
+capabilities:
+  context_window: 128000
+  max_output_tokens: 128000
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0
+  output_per_1k_tokens: 0.0

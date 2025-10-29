@@ -1,0 +1,21 @@
+model:
+  id: deephermes-3-llama-3-8b-preview:free
+  name: "Nous: DeepHermes 3 Llama 3 8B Preview (free)"
+  lab: nousresearch
+  family: deephermes
+  service: openrouter
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0
+  output_per_1k_tokens: 0.0

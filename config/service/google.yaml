@@ -1,0 +1,73 @@
+service:
+  name: Google
+  base_url: https://generativelanguage.googleapis.com
+
+http:
+  request: |
+    POST /v1beta/models/{{model_id}}:generateContent HTTP/1.1
+    Host: generativelanguage.googleapis.com
+    Content-Type: application/json
+    x-goog-api-key: ${GOOGLE_API_KEY}
+
+    {
+      "contents": {{json google_messages}},
+      "generationConfig": {
+        "temperature": {{temperature}},
+        "maxOutputTokens": {{max_tokens}},
+        "topP": {{top_p}}
+      },
+      "safetySettings": [
+        {
+          "category": "HARM_CATEGORY_HARASSMENT",
+          "threshold": "BLOCK_NONE"
+        },
+        {
+          "category": "HARM_CATEGORY_HATE_SPEECH", 
+          "threshold": "BLOCK_NONE"
+        },
+        {
+          "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          "threshold": "BLOCK_NONE"
+        },
+        {
+          "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+          "threshold": "BLOCK_NONE"
+        }
+      ]
+    }
+
+streaming:
+  format: text/event-stream
+  parser: google_sse
+  events:
+    - type: data
+      extract: candidates[0].content.parts[0].text
+      action: content
+      filter: candidates[0].content.parts[0].text
+    - type: data
+      extract: candidates[0].finishReason
+      action: finish
+      filter: candidates[0].finishReason
+
+response:
+  success_codes: [200]
+  extract:
+    content: candidates[0].content.parts[0].text
+    role: candidates[0].content.role
+    finish_reason: candidates[0].finishReason
+    usage:
+      input: usageMetadata.promptTokenCount
+      output: usageMetadata.candidatesTokenCount
+      total: usageMetadata.totalTokenCount
+  error:
+    message: error.message
+    type: error.code
+    code: error.status
+
+message_builder: google
+
+# Rate limiting based on Google's limits
+rate_limits:
+  requests_per_minute: 60
+  tokens_per_minute: 32000
+  concurrent_requests: 5

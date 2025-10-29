@@ -1,0 +1,21 @@
+model:
+  id: sonar-pro
+  name: "Perplexity: Sonar Pro"
+  lab: perplexity
+  family: sonar
+  service: openrouter
+
+capabilities:
+  context_window: 200000
+  max_output_tokens: 8000
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.003
+  output_per_1k_tokens: 0.015000000000000001

@@ -1,0 +1,21 @@
+model:
+  id: deepseek-r1-distill-qwen-14b
+  name: "DeepSeek: R1 Distill Qwen 14B"
+  lab: deepseek
+  family: deepseek
+  service: deepseek
+
+capabilities:
+  context_window: 32768
+  max_output_tokens: 16384
+  multimodal: false
+  vision: false
+  functions: true
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00015
+  output_per_1k_tokens: 0.00015

@@ -1,0 +1,21 @@
+model:
+  id: qwen3-235b-a22b
+  name: "Qwen: Qwen3 235B A22B"
+  lab: qwen
+  family: qwen
+  service: openrouter
+
+capabilities:
+  context_window: 40960
+  max_output_tokens: 40960
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00017999999999999998
+  output_per_1k_tokens: 0.00054

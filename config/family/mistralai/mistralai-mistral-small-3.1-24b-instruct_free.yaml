@@ -1,0 +1,21 @@
+model:
+  id: mistral-small-3.1-24b-instruct:free
+  name: "Mistral: Mistral Small 3.1 24B (free)"
+  lab: mistralai
+  family: mistral
+  service: openrouter
+
+capabilities:
+  context_window: 96000
+  max_output_tokens: 96000
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0
+  output_per_1k_tokens: 0.0

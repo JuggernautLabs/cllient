@@ -1,0 +1,29 @@
+model:
+  id: claude-haiku-4-5-20251001
+  family: claude
+  name: Claude Haiku 4.5 (Oct 2025)
+  version: "4.5"
+  variant: haiku
+  service: anthropic
+
+  status: verified
+capabilities:
+  context_window: 200000
+  max_output_tokens: 8192
+  vision: true
+  functions: true
+  streaming: true
+  json_mode: false
+  system_prompt: true
+  multimodal: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.001
+  output_per_1k_tokens: 0.005
+  cached_input_per_1k_tokens: 0.0005
+
+defaults:
+  temperature: 1.0
+  max_tokens: 8192
+  top_p: 1.0

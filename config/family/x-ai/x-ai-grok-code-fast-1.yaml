@@ -1,0 +1,21 @@
+model:
+  id: grok-code-fast-1
+  name: "xAI: Grok Code Fast 1"
+  lab: x-ai
+  family: grok
+  service: openrouter
+
+capabilities:
+  context_window: 256000
+  max_output_tokens: 10000
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00019999999999999998
+  output_per_1k_tokens: 0.0015

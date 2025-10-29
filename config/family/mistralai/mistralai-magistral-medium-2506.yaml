@@ -1,0 +1,21 @@
+model:
+  id: magistral-medium-2506
+  name: "Mistral: Magistral Medium 2506"
+  lab: mistralai
+  family: mistral
+  service: openrouter
+
+capabilities:
+  context_window: 40960
+  max_output_tokens: 40000
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.002
+  output_per_1k_tokens: 0.005

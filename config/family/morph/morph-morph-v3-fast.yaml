@@ -1,0 +1,21 @@
+model:
+  id: morph-v3-fast
+  name: "Morph: Morph V3 Fast"
+  lab: morph
+  family: morph
+  service: openrouter
+
+capabilities:
+  context_window: 81920
+  max_output_tokens: 38000
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0007999999999999999
+  output_per_1k_tokens: 0.0012

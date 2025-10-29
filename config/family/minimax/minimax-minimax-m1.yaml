@@ -1,0 +1,21 @@
+model:
+  id: minimax-m1
+  name: "MiniMax: MiniMax M1"
+  lab: minimax
+  family: minimax
+  service: openrouter
+
+capabilities:
+  context_window: 1000000
+  max_output_tokens: 40000
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00039999999999999996
+  output_per_1k_tokens: 0.0022

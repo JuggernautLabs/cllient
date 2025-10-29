@@ -1,0 +1,21 @@
+model:
+  id: ernie-4.5-vl-424b-a47b
+  name: "Baidu: ERNIE 4.5 VL 424B A47B "
+  lab: baidu
+  family: ernie
+  service: openrouter
+
+capabilities:
+  context_window: 123000
+  max_output_tokens: 16000
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00042
+  output_per_1k_tokens: 0.00125

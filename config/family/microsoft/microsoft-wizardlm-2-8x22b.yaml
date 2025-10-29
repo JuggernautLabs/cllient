@@ -1,0 +1,21 @@
+model:
+  id: wizardlm-2-8x22b
+  name: "WizardLM-2 8x22B"
+  lab: microsoft
+  family: wizardlm
+  service: openrouter
+
+capabilities:
+  context_window: 65536
+  max_output_tokens: 16384
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00047999999999999996
+  output_per_1k_tokens: 0.00047999999999999996

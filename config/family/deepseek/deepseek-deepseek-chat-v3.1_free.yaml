@@ -1,0 +1,21 @@
+model:
+  id: deepseek-chat-v3.1:free
+  name: "DeepSeek: DeepSeek V3.1 (free)"
+  lab: deepseek
+  family: deepseek
+  service: deepseek
+
+capabilities:
+  context_window: 163800
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: true
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0
+  output_per_1k_tokens: 0.0

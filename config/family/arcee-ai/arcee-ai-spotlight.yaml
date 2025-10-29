@@ -1,0 +1,21 @@
+model:
+  id: spotlight
+  name: "Arcee AI: Spotlight"
+  lab: arcee-ai
+  family: spotlight
+  service: openrouter
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 65537
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00017999999999999998
+  output_per_1k_tokens: 0.00017999999999999998

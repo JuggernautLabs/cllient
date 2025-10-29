@@ -1,0 +1,21 @@
+model:
+  id: deepseek-r1-distill-llama-70b
+  name: "DeepSeek: R1 Distill Llama 70B"
+  lab: deepseek
+  family: deepseek
+  service: deepseek
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 131072
+  multimodal: false
+  vision: false
+  functions: true
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.000029999999999999997
+  output_per_1k_tokens: 0.00013

@@ -1,0 +1,21 @@
+model:
+  id: gpt-4o-mini-search-preview
+  name: "OpenAI: GPT-4o-mini Search Preview"
+  lab: openai
+  family: gpt
+  service: openai
+
+capabilities:
+  context_window: 128000
+  max_output_tokens: 16384
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00015
+  output_per_1k_tokens: 0.0006

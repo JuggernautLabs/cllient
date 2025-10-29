@@ -1,0 +1,21 @@
+model:
+  id: kimi-k2
+  name: "MoonshotAI: Kimi K2 0711"
+  lab: moonshotai
+  family: kimi
+  service: openrouter
+
+capabilities:
+  context_window: 63000
+  max_output_tokens: 63000
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00014000000000000001
+  output_per_1k_tokens: 0.00249

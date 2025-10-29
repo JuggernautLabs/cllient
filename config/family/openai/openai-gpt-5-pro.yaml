@@ -1,0 +1,21 @@
+model:
+  id: gpt-5-pro
+  name: "OpenAI: GPT-5 Pro"
+  lab: openai
+  family: gpt
+  service: openai-responses
+
+capabilities:
+  context_window: 400000
+  max_output_tokens: 128000
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.015000000000000001
+  output_per_1k_tokens: 0.12000000000000001

@@ -1,0 +1,21 @@
+model:
+  id: gpt-5-mini
+  name: "OpenAI: GPT-5 Mini"
+  lab: openai
+  family: gpt
+  service: openai
+
+capabilities:
+  context_window: 400000
+  max_output_tokens: 128000
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00025
+  output_per_1k_tokens: 0.002

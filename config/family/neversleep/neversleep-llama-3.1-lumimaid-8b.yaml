@@ -1,0 +1,21 @@
+model:
+  id: llama-3.1-lumimaid-8b
+  name: "NeverSleep: Lumimaid v0.2 8B"
+  lab: neversleep
+  family: llama
+  service: openrouter
+
+capabilities:
+  context_window: 32768
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00008999999999999999
+  output_per_1k_tokens: 0.0006

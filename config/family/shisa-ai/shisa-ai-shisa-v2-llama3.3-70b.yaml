@@ -1,0 +1,21 @@
+model:
+  id: shisa-v2-llama3.3-70b
+  name: "Shisa AI: Shisa V2 Llama 3.3 70B "
+  lab: shisa-ai
+  family: shisa
+  service: openrouter
+
+capabilities:
+  context_window: 32768
+  max_output_tokens: 32768
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.000049999999999999996
+  output_per_1k_tokens: 0.00022

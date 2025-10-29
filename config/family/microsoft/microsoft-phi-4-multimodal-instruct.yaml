@@ -1,0 +1,21 @@
+model:
+  id: phi-4-multimodal-instruct
+  name: "Microsoft: Phi 4 Multimodal Instruct"
+  lab: microsoft
+  family: phi
+  service: openrouter
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 4096
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.000049999999999999996
+  output_per_1k_tokens: 0.00009999999999999999

@@ -1,0 +1,21 @@
+model:
+  id: ernie-4.5-21b-a3b-thinking
+  name: "Baidu: ERNIE 4.5 21B A3B Thinking"
+  lab: baidu
+  family: ernie
+  service: openrouter
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 65536
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00007000000000000001
+  output_per_1k_tokens: 0.00028000000000000003

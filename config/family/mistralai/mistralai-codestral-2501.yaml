@@ -1,0 +1,21 @@
+model:
+  id: codestral-2501
+  name: "Mistral: Codestral 2501"
+  lab: mistralai
+  family: mistral
+  service: openrouter
+
+capabilities:
+  context_window: 262144
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0003
+  output_per_1k_tokens: 0.0009

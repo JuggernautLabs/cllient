@@ -1,0 +1,79 @@
+{
+  "openai": {
+    "service": "openai",
+    "family_mapping": {
+      "gpt-3.5": "gpt",
+      "gpt-4": "gpt", 
+      "gpt-5": "gpt",
+      "o1": "o1",
+      "o3": "o3",
+      "o4": "o4",
+      "chatgpt": "gpt"
+    },
+    "has_defaults": true,
+    "openai_options": true,
+    "default_temperature": 0.7,
+    "default_max_tokens": 4096,
+    "default_top_p": 1.0,
+    "default_frequency_penalty": 0.0,
+    "default_presence_penalty": 0.0
+  },
+  "anthropic": {
+    "service": "anthropic",
+    "family_mapping": {
+      "claude-3": "claude",
+      "claude-4": "claude",
+      "claude-haiku": "claude",
+      "claude-sonnet": "claude",
+      "claude-opus": "claude"
+    },
+    "has_defaults": true,
+    "anthropic_options": true,
+    "default_temperature": 1.0,
+    "default_max_tokens": 4096
+  },
+  "deepseek": {
+    "service": "deepseek",
+    "family_mapping": {
+      "deepseek": "deepseek"
+    },
+    "has_defaults": true,
+    "default_temperature": 0.7,
+    "default_max_tokens": 4096
+  },
+  "google": {
+    "service": "google",
+    "family_mapping": {
+      "gemini": "gemini"
+    },
+    "has_defaults": true,
+    "default_temperature": 0.7,
+    "default_max_tokens": 4096
+  },
+  "meta-llama": {
+    "service": "openrouter",
+    "family_mapping": {
+      "llama": "llama"
+    },
+    "has_defaults": false
+  },
+  "mistralai": {
+    "service": "openrouter",
+    "family_mapping": {
+      "mistral": "mistral"
+    },
+    "has_defaults": false
+  },
+  "qwen": {
+    "service": "openrouter",
+    "family_mapping": {
+      "qwen": "qwen"
+    },
+    "has_defaults": false
+  },
+  "default": {
+    "service": "openrouter",
+    "family_mapping": {},
+    "has_defaults": false
+  }
+}

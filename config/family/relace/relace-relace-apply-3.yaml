@@ -1,0 +1,21 @@
+model:
+  id: relace-apply-3
+  name: "Relace: Relace Apply 3"
+  lab: relace
+  family: relace
+  service: openrouter
+
+capabilities:
+  context_window: 256000
+  max_output_tokens: 128000
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0008500000000000001
+  output_per_1k_tokens: 0.00125

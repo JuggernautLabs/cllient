@@ -1,0 +1,21 @@
+model:
+  id: gemma-3n-e4b-it
+  name: "Google: Gemma 3n 4B"
+  lab: google
+  family: gemma
+  service: google
+
+capabilities:
+  context_window: 32768
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00002
+  output_per_1k_tokens: 0.00004

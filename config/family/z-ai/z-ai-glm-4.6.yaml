@@ -1,0 +1,21 @@
+model:
+  id: glm-4.6
+  name: "Z.AI: GLM 4.6"
+  lab: z-ai
+  family: glm
+  service: openrouter
+
+capabilities:
+  context_window: 202752
+  max_output_tokens: 202752
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0005
+  output_per_1k_tokens: 0.00175

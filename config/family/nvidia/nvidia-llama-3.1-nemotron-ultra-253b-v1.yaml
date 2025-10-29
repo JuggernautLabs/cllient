@@ -1,0 +1,21 @@
+model:
+  id: llama-3.1-nemotron-ultra-253b-v1
+  name: "NVIDIA: Llama 3.1 Nemotron Ultra 253B v1"
+  lab: nvidia
+  family: llama
+  service: openrouter
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0006
+  output_per_1k_tokens: 0.0018

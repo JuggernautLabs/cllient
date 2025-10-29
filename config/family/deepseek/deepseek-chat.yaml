@@ -1,0 +1,30 @@
+model:
+  id: deepseek-chat
+  family: deepseek
+  name: DeepSeek Chat
+  version: "1.5"
+  variant: chat
+  service: deepseek
+
+capabilities:
+  context_window: 32768
+  max_output_tokens: 4096
+  vision: false
+  functions: false
+  streaming: true
+  json_mode: false
+  system_prompt: true
+  multimodal: false
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.000014
+  output_per_1k_tokens: 0.000028
+
+defaults:
+  temperature: 1.0
+  max_tokens: 4096
+  top_p: 1.0
+  frequency_penalty: 0.0
+  presence_penalty: 0.0
+

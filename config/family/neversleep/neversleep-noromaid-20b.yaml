@@ -1,0 +1,21 @@
+model:
+  id: noromaid-20b
+  name: "Noromaid 20B"
+  lab: neversleep
+  family: noromaid
+  service: openrouter
+
+capabilities:
+  context_window: 4096
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.001
+  output_per_1k_tokens: 0.00175

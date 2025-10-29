@@ -1,0 +1,21 @@
+model:
+  id: gemini-2.5-flash
+  name: "Google: Gemini 2.5 Flash"
+  lab: google
+  family: gemini
+  service: google
+
+capabilities:
+  context_window: 1048576
+  max_output_tokens: 65535
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0003
+  output_per_1k_tokens: 0.0025

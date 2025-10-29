@@ -1,0 +1,21 @@
+model:
+  id: {{id}}
+  name: "{{name}}"
+  lab: {{lab}}
+  family: {{family}}
+  service: {{service}}
+
+capabilities:
+  context_window: {{context_length}}
+  max_output_tokens: {{max_output_tokens}}
+  multimodal: {{multimodal}}
+  vision: {{vision}}
+  functions: {{functions}}
+  json_mode: {{json_mode}}
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: {{input_cost_per_1k}}
+  output_per_1k_tokens: {{output_cost_per_1k}}

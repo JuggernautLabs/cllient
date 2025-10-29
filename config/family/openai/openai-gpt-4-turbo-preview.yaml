@@ -1,0 +1,21 @@
+model:
+  id: gpt-4-turbo-preview
+  name: "OpenAI: GPT-4 Turbo Preview"
+  lab: openai
+  family: gpt
+  service: openai
+
+capabilities:
+  context_window: 128000
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.01
+  output_per_1k_tokens: 0.030000000000000002

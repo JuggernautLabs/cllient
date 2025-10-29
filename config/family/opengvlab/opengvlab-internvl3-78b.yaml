@@ -1,0 +1,21 @@
+model:
+  id: internvl3-78b
+  name: "OpenGVLab: InternVL3 78B"
+  lab: opengvlab
+  family: internvl3
+  service: openrouter
+
+capabilities:
+  context_window: 32768
+  max_output_tokens: 32768
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00007000000000000001
+  output_per_1k_tokens: 0.00026

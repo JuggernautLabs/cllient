@@ -1,0 +1,46 @@
+model:
+  id: {{id}}
+  name: {{name}}
+  family: {{family}}
+  service: {{service}}{{#version}}
+  version: "{{version}}"{{/version}}{{#variant}}
+  variant: {{variant}}{{/variant}}
+
+capabilities:
+  context_window: {{context_length}}
+{{#max_completion_tokens}}  max_output_tokens: {{max_completion_tokens}}
+{{/max_completion_tokens}}{{#has_vision}}  vision: true
+{{/has_vision}}{{#has_multimodal}}  multimodal: true
+{{/has_multimodal}}  streaming: true
+{{#has_json_mode}}  json_mode: true
+{{/has_json_mode}}{{#has_functions}}  functions: true
+{{/has_functions}}  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: {{input_cost_per_1k}}
+  output_per_1k_tokens: {{output_cost_per_1k}}
+{{#image_cost}}  image_cost: {{image_cost}}
+{{/image_cost}}
+
+{{#has_defaults}}
+defaults:
+  temperature: {{default_temperature}}
+  max_tokens: {{default_max_tokens}}
+{{#default_top_p}}  top_p: {{default_top_p}}
+{{/default_top_p}}{{#default_frequency_penalty}}  frequency_penalty: {{default_frequency_penalty}}
+{{/default_frequency_penalty}}{{#default_presence_penalty}}  presence_penalty: {{default_presence_penalty}}
+{{/default_presence_penalty}}{{/has_defaults}}
+
+{{#openai_options}}
+openai_options:
+  response_format:
+    type: text
+  seed: null
+  logit_bias: {}
+{{/openai_options}}
+
+{{#anthropic_options}}
+anthropic_options:
+  max_tokens: {{default_max_tokens}}
+{{/anthropic_options}}

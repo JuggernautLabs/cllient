@@ -1,0 +1,21 @@
+model:
+  id: nova-micro-v1
+  name: "Amazon: Nova Micro 1.0"
+  lab: amazon
+  family: nova
+  service: openrouter
+
+capabilities:
+  context_window: 128000
+  max_output_tokens: 5120
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.000035000000000000004
+  output_per_1k_tokens: 0.00014000000000000001
