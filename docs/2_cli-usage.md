@@ -78,21 +78,62 @@ cllient --json ask gpt-4o-mini "What is 2+2?"
 
 ### `stream` - Real-time Streaming Response
 
-Get responses in real-time as they're generated.
+Get responses in real-time as they're generated. The stream command supports two output modes: JSON (default) and Pretty (human-readable).
 
 > **Streaming Implementation**: [`src/streaming/`](../src/streaming/)
+> **JSON Output**: [`src/streaming_json.rs`](../src/streaming_json.rs)
+
+#### JSON Mode (Default) - Streaming JSON Structure
+
+The default output mode streams a valid JSON structure as it's being built:
 
 ```bash
-# Basic usage  
-cllient stream <model> "<prompt>"
+# Default JSON streaming - see the response field populate in real-time
+cllient stream deepseek-chat "Count to 5"
 
-# Examples - great for longer responses
+# Output (streaming as it arrives):
+{
+  "model": "deepseek-chat",
+  "prompt": "Count to 5",
+  "response": "1, 2, 3, 4, 5",
+  "streamed": true,
+  "success": true
+}
+```
+
+The JSON structure is output incrementally - you'll see the response field being filled character-by-character as tokens arrive from the LLM.
+
+#### Pretty Mode - Human-Readable Output
+
+For interactive terminal use, add the `--pretty` flag for formatted output with emojis:
+
+```bash
+# Human-readable output with decorations
+cllient --pretty stream gpt-4-turbo "Write a haiku about code"
+
+# Output:
+🤖 Model: gpt-4-turbo
+💭 Prompt: Write a haiku about code
+📡 Streaming response:
+
+Lines of logic flow
+Silent commands shape the world
+Code breathes life anew
+```
+
+#### Examples
+
+```bash
+# Long-form responses work great with streaming
 cllient stream gpt-4-turbo "Write a detailed essay on climate change"
 cllient stream claude-3-5-sonnet-20241022 "Create a recipe for chocolate cake"
 cllient stream deepseek-coder "Explain how HTTP works"
 
-# JSON streaming output
-cllient --json stream claude-3-haiku "Count to 5"
+# JSON mode for automation/parsing
+cllient stream claude-3-haiku "Count to 5" | jq -r '.response'
+
+# Pretty mode for terminal viewing
+cllient --pretty stream deepseek-chat "Tell me a joke"
 ```
 
 ### `chat` - Interactive Conversation
@@ -139,14 +180,16 @@ cllient compare gpt-4-turbo,claude-3-5-sonnet-20241022 "Write a haiku about prog
 cllient --verbose list
 cllient -v ask gpt-4o-mini "Hello"
 
-# Output in JSON format
-cllient --json list
-cllient --json ask gpt-4o-mini "Hello"
-cllient --json stream claude-3-haiku-20240307 "Count to 5"
+# Human-readable pretty output (with emojis)
+cllient --pretty list
+cllient --pretty ask gpt-4o-mini "Hello"
+cllient --pretty stream claude-3-haiku-20240307 "Count to 5"
 
 # Combine flags
-cllient --verbose --json list claude
+cllient --verbose --pretty list claude
 ```
+
+**Note**: Most commands default to JSON output. Use `--pretty` for human-readable output with emoji decorators.
 
 ### Environment Variables
 

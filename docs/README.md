@@ -34,6 +34,7 @@ Welcome to the comprehensive documentation for **cllient** - a runtime-configura
 
 ### Streaming & Communication
 - **[Streaming Infrastructure](../src/streaming/)** - Real-time response processing
+- **[Streaming JSON Output](../src/streaming_json.rs)** - Incremental JSON state machine
 - **[HTTP Client](../src/client.rs)** - Low-level HTTP communication
 - **[Template Engine](../src/template.rs)** - Handlebars request templating
 
@@ -42,6 +43,7 @@ Welcome to the comprehensive documentation for **cllient** - a runtime-configura
 ### I want to...
 - **Use cllient from command line** → [2. CLI Usage Guide](2_cli-usage.md)
 - **Integrate cllient into my Rust app** → [3. API Reference](3_api-reference.md#runtime-api)
+- **Use streaming JSON output** → [Streaming JSON Examples](examples/streaming-json.md)
 - **Add a new LLM provider** → [4. Configuration](4_configuration.md#adding-providers)
 - **Understand the architecture** → [5. Architecture](5_architecture.md)
 - **See usage examples** → [Examples](examples/)

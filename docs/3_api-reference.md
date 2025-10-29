@@ -362,6 +362,138 @@ Content::Document {
 
 ---
 
+## Streaming JSON Output API
+
+> **Source**: [`src/streaming_json.rs`](../src/streaming_json.rs) | **Examples**: [`examples/test_streaming_json.rs`](../examples/test_streaming_json.rs)
+
+Low-level API for outputting JSON structures incrementally to stdout. Useful for building streaming responses in custom applications.
+
+### StreamingJsonObject
+
+A state machine that outputs JSON object structures as they're being built:
+
+```rust
+use cllient::streaming_json::StreamingJsonObject;
+
+let mut json = StreamingJsonObject::new()?;
+
+// Write static fields
+json.field_string("model", "gpt-4o-mini")?;
+json.field_bool("streaming", true)?;
+
+// Close the object
+json.close()?;
+
+// Output (immediate):
+// {
+//   "model": "gpt-4o-mini",
+//   "streaming": true
+// }
+```
+
+### Streaming String Fields
+
+For dynamic content that arrives incrementally (like LLM responses):
+
+```rust
+let mut json = StreamingJsonObject::new()?;
+json.field_string("model", "deepseek-chat")?;
+
+// Start streaming field
+let mut response = json.field_streaming_string("response")?;
+
+// Write chunks as they arrive
+response.write_chunk("Hello")?;
+response.write_chunk(" ")?;
+response.write_chunk("world")?;
+
+// Close the field
+response.close()?;
+
+json.field_bool("success", true)?;
+json.close()?;
+
+// Output (streams incrementally):
+// {
+//   "model": "deepseek-chat",
+//   "response": "Hello world",
+//   "success": true
+// }
+```
+
+### Full Example with LLM Streaming
+
+```rust
+use cllient::streaming_json::StreamingJsonObject;
+use futures::StreamExt;
+
+async fn stream_response(model_id: &str, prompt: &str) -> std::io::Result<()> {
+    let mut json = StreamingJsonObject::new()?;
+
+    json.field_string("model", model_id)?;
+    json.field_string("prompt", prompt)?;
+
+    // Get LLM stream
+    let client = create_client(model_id)?;
+    let mut stream = client.complete_stream(&request).await?;
+
+    // Start streaming response field
+    let mut response_writer = json.field_streaming_string("response")?;
+
+    // Stream each chunk to JSON output
+    while let Some(chunk) = stream.next().await {
+        response_writer.write_chunk(&chunk?)?;
+    }
+
+    response_writer.close()?;
+    json.field_bool("success", true)?;
+    json.close()?;
+
+    Ok(())
+}
+```
+
+### JSON Escaping
+
+The API automatically handles JSON special characters:
+
+```rust
+response.write_chunk("Line 1\n")?;           // → "Line 1\n"
+response.write_chunk("Quote: \"hello\"")?;  // → "Quote: \"hello\""
+response.write_chunk("Path: C:\\file")?;    // → "Path: C:\\file"
+```
+
+### API Methods
+
+#### `StreamingJsonObject`
+
+| Method | Description |
+|--------|-------------|
+| `new()` | Initialize and output opening `{` |
+| `field_string(key, value)` | Write a string field |
+| `field_bool(key, value)` | Write a boolean field |
+| `field_streaming_string(key)` | Start a streaming string field |
+| `close()` | Output closing `}` |
+
+#### `StreamingJsonString`
+
+| Method | Description |
+|--------|-------------|
+| `write_chunk(chunk)` | Append text to the field value |
+| `close()` | Output closing quote |
+
+### Tracing Support
+
+All operations are instrumented with `tracing`:
+
+```bash
+# Enable debug logging
+RUST_LOG=cllient::streaming_json=debug cargo run
+RUST_LOG=trace cargo run  # For chunk-level details
+```
+
+---
+
 ## Provider Integration
 
 > **Service Configs**: [`config/service/`](../config/service/)

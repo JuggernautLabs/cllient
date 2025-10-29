@@ -43,8 +43,11 @@ cllient list
 # Simple completion
 cllient ask gpt-4o-mini "What is Rust programming?"
 
-# Real-time streaming
+# Real-time streaming (JSON output - see response build in real-time)
 cllient stream deepseek-chat "Tell me a story about robots"
+
+# Human-readable streaming with emojis
+cllient --pretty stream deepseek-chat "Tell me a story about robots"
 
 # Interactive chat
 cllient chat claude-3-haiku-20240307
