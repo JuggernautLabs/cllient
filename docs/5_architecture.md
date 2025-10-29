@@ -142,6 +142,75 @@ Raw SSE → Provider Parser → Content Extractor → StreamChunk
 - **[Content Extractors](../src/streaming/sse/extractors/)** - Extract text from responses
 - **[JSON Utils](../src/streaming/json_utils.rs)** - JSON path extraction
 
+### 6. Streaming JSON Output System
+
+> **Source**: [`src/streaming_json.rs`](../src/streaming_json.rs)
+
+A specialized state machine for outputting JSON structures incrementally to stdout:
+
+```
+State Machine Flow:
+┌────────────┐   field_string()   ┌──────────────┐
+│ Initialize │ ──────────────────→ │ Write Fields │
+│  Output {  │                     │   (static)   │
+└────────────┘                     └──────────────┘
+                                          │
+                             field_streaming_string()
+                                          ↓
+                                   ┌──────────────┐
+                                   │ Stream Field │
+                                   │  (dynamic)   │
+                                   └──────────────┘
+                                          │
+                                     close()
+                                          ↓
+                                   ┌──────────────┐
+                                   │  Finalize    │
+                                   │  Output }    │
+                                   └──────────────┘
+```
+
+**Key Features**:
+- **Incremental Output**: JSON structure streams as it's built
+- **Real-time Visibility**: See response field populate character-by-character
+- **Valid JSON**: Output is always parseable, even mid-stream
+- **Automatic Escaping**: Handles JSON special characters (quotes, newlines, etc.)
+- **Instrumented**: Full tracing support for debugging
+
+**Usage Example**:
+
+```rust
+let mut json = StreamingJsonObject::new()?;
+json.field_string("model", "gpt-4o-mini")?;
+
+let mut response = json.field_streaming_string("response")?;
+// Tokens stream in from LLM...
+response.write_chunk("Hello")?;
+response.write_chunk(" world")?;
+response.close()?;
+
+json.field_bool("success", true)?;
+json.close()?;
+
+// Output (streaming incrementally):
+// {
+//   "model": "gpt-4o-mini",
+//   "response": "Hello world",
+//   "success": true
+// }
+```
+
+**Tracing Integration**:
+
+With `--verbose` flag, the streaming JSON module logs all operations:
+
+```bash
+DEBUG cllient::streaming_json: Initializing streaming JSON object
+DEBUG field_string{key="model"}: Writing string field key=model value_len=11
+DEBUG field_streaming_string{key="response"}: Starting streaming string field
+TRACE write_chunk: Writing chunk chunk_len=5 chunk_preview="Hello"
+```
+
 ---
 
 ## Data Flow Architecture
