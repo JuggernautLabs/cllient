@@ -1,17 +1,25 @@
-# cllient - Runtime-Configurable LLM Client
+# cllient - Experimental Config-Driven LLM Client
 
-> **Foreword**: This whole project, including the readme, was generated with concerningly little human oversight. I have tested that core features work for 3 families: openai, claude, and deepseek. That being said I believe that what is built here, a configuration driven llm client library, can serve as the basis for type-safe clients, agents, and more.
+> **⚠️ Experimental Status**: This project is a proof-of-concept built with AI assistance and minimal human oversight. Only **3 providers** have been actually tested (OpenAI, Anthropic, DeepSeek). The other 242 model configs route through OpenRouter and were auto-generated from their API. Use at your own risk.
 
-A flexible, high-performance LLM client system written in Rust that separates services (OpenAI, Anthropic, etc.) from models (GPT-4, Claude, etc.) for maximum flexibility and runtime configuration.
+An experimental Rust LLM client that uses YAML configuration files instead of hardcoded provider logic. The core idea: separate "services" (API endpoints) from "models" (what you call) so you can add new providers without touching code.
 
-## ✨ Key Features
+## ✨ What Works
 
-- 🚀 **330+ Pre-configured Models** - OpenAI, Anthropic, DeepSeek, Google, and 70+ providers
-- 📡 **Real-time Streaming** - Token-level streaming with Server-Sent Events (SSE)
-- 💰 **Cost Optimization** - Built-in pricing data with cheapest/fastest model selection
-- 🔧 **Zero Code Changes** - Add providers via YAML configuration
-- 🎯 **Multiple APIs** - CLI, high-level Runtime API, and low-level HTTP client
-- 📦 **Self-contained** - Embedded configurations compiled into binary
+- 🧪 **3 Tested Providers** - OpenAI, Anthropic, and DeepSeek work reliably
+- 📡 **SSE Streaming** - Token-level streaming with Server-Sent Events
+- 🔧 **Config-Driven** - Add providers via YAML without code changes (in theory)
+- 📦 **339 Model Configs** - Mostly OpenRouter routes (242), some direct integrations (97)
+- 🎯 **Multiple APIs** - CLI tool, Rust library, basic runtime API
+- 💰 **Pricing Data** - Auto-scraped from OpenRouter API (accuracy not guaranteed)
+
+## 🚧 What's Experimental
+
+- **OpenRouter dependency**: 71% of model configs just proxy through OpenRouter
+- **Untested configs**: Most of the 242 OpenRouter models haven't been validated
+- **No error handling**: Fails ungracefully when things go wrong
+- **Template fragility**: YAML HTTP templates can break easily
+- **Zero production use**: This is a research project, not production-ready
 
 ## 🚀 Quick Start
 
@@ -90,41 +98,85 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - **[6. Development](docs/6_development.md)** - Contributing, testing, workflow automation
 - **[Complete Documentation Hub](docs/)** - All guides and references
 
-## 🏗️ Architecture Overview
+## 🏗️ The Interesting Part: Architecture
 
-cllient uses a **flexible architecture** where services and models exist independently:
+The core idea is **"unassociated truth"** - services and models are separate entities that can be mixed:
 
 ```
-Traditional: gpt-4 → OpenAI only ❌
-cllient:     gpt-4 → {OpenAI, Azure, OpenRouter} ✅
+Traditional client libraries:
+  gpt-4 → hardcoded to talk to OpenAI API ❌
 
-Traditional: Code changes for new providers ❌  
-cllient:     YAML configuration only ✅
+cllient approach:
+  gpt-4 → can use {OpenAI, Azure, OpenRouter} ✅
+  Model configs reference service configs
+  Service configs are HTTP templates
 ```
 
-**Core Components** ([5. Architecture Guide](docs/5_architecture.md)):
-- **[ModelRegistry](src/runtime.rs#L12)** - High-level model selection and request building
-- **[Configuration System](src/config.rs)** - Embedded + external YAML configs
-- **[HTTP Client](src/client.rs)** - Provider communication with streaming
-- **[Template Engine](src/template.rs)** - Handlebars request templating
+**How it works:**
+
+1. **Service configs** (`config/service/*.yaml`) define HTTP request templates using Handlebars:
+   ```yaml
+   http:
+     request: |
+       POST /v1/chat/completions HTTP/1.1
+       Authorization: Bearer ${OPENAI_API_KEY}
+       {"model": "{{model_id}}", "messages": {{json messages}}}
+   ```
+
+2. **Model configs** (`config/family/*/*.yaml`) reference a service and add metadata:
+   ```yaml
+   model:
+     id: gpt-4o-mini
+     service: openai  # Points to config/service/openai.yaml
+   capabilities:
+     context_window: 128000
+   ```
+
+3. **Runtime** loads configs, renders templates, makes HTTP requests
+
+**Why this is neat:**
+- Add new providers by writing YAML, not Rust
+- Same model can work through multiple services
+- HTTP templates make debugging transparent (see exactly what's sent)
+- Configs can be embedded in binary or loaded at runtime
+
+**Core Components:**
+- **[ModelRegistry](src/runtime.rs#L12)** - High-level API for model selection
+- **[Configuration System](src/config.rs)** - Loads and validates YAML
+- **[HTTP Client](src/client.rs)** - Renders templates, handles streaming
+- **[Template Engine](src/template.rs)** - Handlebars + environment variables
 
 ## 🔧 Configuration
 
-### Available Models
+### What's Actually Available
 
-- **OpenAI**: `gpt-4o`, `gpt-4o-mini`, `o1`, `o1-mini` (330+ total models)
-- **Anthropic**: `claude-3-opus`, `claude-3-5-sonnet`, `claude-3-haiku`  
-- **DeepSeek**: `deepseek-chat`, `deepseek-coder`, `deepseek-v3`
-- **Google**: `gemini-2.0-flash`, `gemini-pro`, `gemma` variants
-- **+70 providers**: Meta, Microsoft, Cohere, X.AI, Perplexity, etc.
+**Tested & Working (97 models across 5 direct integrations):**
+- **OpenAI** (35 models): `gpt-4o`, `gpt-4o-mini`, `o1`, `o1-mini`, etc.
+- **Anthropic** (12 models): `claude-3-opus`, `claude-3-5-sonnet`, `claude-3-haiku`
+- **DeepSeek** (22 models): `deepseek-chat`, `deepseek-coder`, `deepseek-v3`
+- **Google** (25 models): `gemini-2.0-flash`, `gemini-pro`, `gemma` variants
+- **Legacy OpenAI** (3 models): Old completion endpoints
+
+**Via OpenRouter (242 models, untested):**
+- Meta, Microsoft, Cohere, X.AI, Perplexity, and 50+ others
+- These are auto-generated configs that *should* work but haven't been validated
+- Requires `OPEN_ROUTER_API_KEY` environment variable
 
 ### Environment Variables
 
 ```bash
-# Core providers (add to .env)
+# Tested providers (add to .env)
 OPENAI_API_KEY=your_openai_key
-ANTHROPIC_API_KEY=your_anthropic_key  
+ANTHROPIC_API_KEY=your_anthropic_key
 DEEPSEEK_API_KEY=your_deepseek_key
+
+# OpenRouter (gives access to 242 models)
+OPEN_ROUTER_API_KEY=your_openrouter_key
+HTTP_REFERER=http://localhost:3000  # Required by OpenRouter
+X_TITLE=cllient                      # Optional app name
+
+# Google (untested but configured)
+GOOGLE_API_KEY=your_google_key
 
 # Optional: Custom config directory
 CLLIENT_CONFIG_DIR=/path/to/custom/configs
@@ -182,27 +234,69 @@ make cost-analysis
 
 **Complete Development Guide**: [6. Development Documentation](docs/6_development.md)
 
-## 📈 Roadmap
+## 📈 What's Done vs. What's Next
 
-- [x] Core Rust implementation with streaming
-- [x] 330+ models across 70+ providers  
-- [x] Configuration-driven architecture
-- [x] Cost tracking and optimization
-- [x] Comprehensive CLI and APIs
+**Actually Completed:**
+- [x] Core Rust implementation with SSE streaming
+- [x] Config-driven architecture (YAML templates)
+- [x] Basic CLI tool (ask, stream, chat, compare)
+- [x] 3 tested providers (OpenAI, Anthropic, DeepSeek)
+- [x] OpenRouter integration (242 auto-generated configs)
+- [x] Pricing data scraping from OpenRouter
+
+**Aspirational (Not Started):**
+- [ ] Test the 242 OpenRouter models individually
+- [ ] Validate Google/Azure/other direct integrations
 - [ ] Python bindings (PyO3)
 - [ ] TypeScript type generation
-- [ ] Advanced retry logic and caching
-- [ ] Local model support
+- [ ] Proper error handling and retry logic
+- [ ] Production hardening
+- [ ] Local model support (llama.cpp, etc.)
 
 ## 🤝 Contributing
 
+This is an experimental project, so contributions are welcome but come with caveats:
+
+**Good first contributions:**
+- Test one of the 242 OpenRouter models and report if it works
+- Add a new direct provider integration (not through OpenRouter)
+- Improve error handling for common failure modes
+- Fix the brittle template system
+- Add tests (there aren't many)
+
+**Before contributing:**
+1. Understand this is a research project, not production software
+2. The codebase was mostly AI-generated and may have lurking issues
+3. Check existing issues to see if someone's already working on it
+
+**If you still want to help:**
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
 3. Make changes and test: `make test && make lint`
-4. Commit changes: `make commit`
-5. Submit a pull request
+4. Submit a pull request with clear description of what you tested
 
-**See**: [6. Development Guide](docs/6_development.md) for detailed contribution guidelines.
+**See**: [6. Development Guide](docs/6_development.md) for detailed workflows.
+
+## 🤔 Should I Use This?
+
+**Use this if:**
+- You want to experiment with the config-driven architecture idea
+- You're researching LLM client design patterns
+- You need quick access to OpenRouter's 242 models via one interface
+- You're okay debugging YAML templates when they break
+- You want to learn how SSE streaming works in Rust
+
+**Don't use this if:**
+- You need a production-ready LLM client (use the official SDKs)
+- You want comprehensive error handling and retries
+- You need 100% stability and uptime
+- You're not comfortable with experimental software
+- You need Python/JS bindings (they don't exist yet)
+
+**Alternatives to consider:**
+- Official SDKs: `openai`, `anthropic`, `google-generativeai` Python packages
+- LangChain / LlamaIndex: More mature, battle-tested frameworks
+- LiteLLM: Similar unified interface concept, but production-ready
 
 ## 📄 License
 
@@ -220,3 +314,7 @@ This project is licensed under the terms specified in the [LICENSE](LICENSE) fil
 ---
 
 **Quick Links**: [📖 Documentation](docs/) | [🚀 Examples](docs/examples/) | [⚙️ Configuration](docs/4_configuration.md) | [🏗️ Architecture](docs/5_architecture.md)
+
+---
+
+**Disclaimer**: This is experimental research software. For production use, consider [LiteLLM](https://github.com/BerriAI/litellm) or official provider SDKs.
