@@ -1,0 +1,21 @@
+model:
+  id: mai-ds-r1
+  name: "Microsoft: MAI DS R1"
+  lab: microsoft
+  family: mai
+  service: openrouter
+
+capabilities:
+  context_window: 163840
+  max_output_tokens: 163840
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0003
+  output_per_1k_tokens: 0.0012

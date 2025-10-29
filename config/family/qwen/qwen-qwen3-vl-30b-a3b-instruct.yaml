@@ -1,0 +1,21 @@
+model:
+  id: qwen3-vl-30b-a3b-instruct
+  name: "Qwen: Qwen3 VL 30B A3B Instruct"
+  lab: qwen
+  family: qwen
+  service: openrouter
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 32768
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00019999999999999998
+  output_per_1k_tokens: 0.0007

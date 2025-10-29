@@ -1,0 +1,22 @@
+model:
+  id: chatgpt-4o-latest
+  name: "OpenAI: ChatGPT-4o"
+  lab: openai
+  family: gpt
+  service: openai
+
+  status: error
+capabilities:
+  context_window: 128000
+  max_output_tokens: 16384
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.005
+  output_per_1k_tokens: 0.015000000000000001

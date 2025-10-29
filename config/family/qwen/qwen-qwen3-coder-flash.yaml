@@ -1,0 +1,21 @@
+model:
+  id: qwen3-coder-flash
+  name: "Qwen: Qwen3 Coder Flash"
+  lab: qwen
+  family: qwen
+  service: openrouter
+
+capabilities:
+  context_window: 128000
+  max_output_tokens: 65536
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0003
+  output_per_1k_tokens: 0.0015

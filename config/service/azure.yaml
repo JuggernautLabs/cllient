@@ -1,0 +1,65 @@
+service:
+  name: Azure OpenAI
+  base_url: https://your-resource.openai.azure.com/
+
+http:
+  request: |
+    POST /openai/deployments/{{deployment_name}}/chat/completions HTTP/1.1
+    Host: {{azure_endpoint}}
+    Content-Type: application/json
+    api-key: ${AZURE_OPENAI_API_KEY}
+    api-version: 2024-02-15-preview
+
+    {
+      "model": "{{model_id}}",
+      "messages": {{json messages}},
+      "temperature": {{temperature}},
+      "max_tokens": {{max_tokens}},
+      "stream": {{stream}}
+    }
+
+streaming:
+  format: text/event-stream
+  parser: openai_sse
+
+# Azure-specific configuration
+azure:
+  endpoint_env_var: "AZURE_OPENAI_ENDPOINT"
+  deployment_mapping:
+    gpt-4o: "gpt-4o-deployment"
+    gpt-4o-mini: "gpt-4o-mini-deployment"
+    gpt-4-turbo: "gpt-4-turbo-deployment"
+
+# Optional fields that can be injected based on capabilities
+optional:
+  top_p: |
+    "top_p": {{top_p}},
+  frequency_penalty: |
+    "frequency_penalty": {{frequency_penalty}},
+  presence_penalty: |
+    "presence_penalty": {{presence_penalty}},
+  stop: |
+    "stop": {{json stop}},
+
+response:
+  success_codes: [200]
+  extract:
+    content: choices[0].message.content
+    role: choices[0].message.role
+    finish_reason: choices[0].finish_reason
+    usage:
+      input: usage.prompt_tokens
+      output: usage.completion_tokens
+      total: usage.total_tokens
+  error:
+    message: error.message
+    type: error.type
+    code: error.code
+
+message_builder: openai  # Azure uses OpenAI-compatible message format
+
+# Rate limiting based on Azure's limits
+rate_limits:
+  requests_per_minute: 60
+  tokens_per_minute: 240000
+  concurrent_requests: 10

@@ -1,0 +1,34 @@
+{
+  "vision_capable_patterns": [
+    "gpt-4o*",
+    "gpt-4-vision*", 
+    "claude-3*",
+    "gemini*",
+    "qwen-vl*"
+  ],
+  "function_capable_patterns": [
+    "gpt-3.5*",
+    "gpt-4*",
+    "gpt-5*",
+    "claude-3*",
+    "claude-4*",
+    "gemini*",
+    "deepseek*"
+  ],
+  "json_mode_capable_patterns": [
+    "gpt-4*",
+    "gpt-3.5-turbo*",
+    "gpt-5*"
+  ],
+  "multimodal_indicators": [
+    "vision",
+    "image",
+    "audio"
+  ],
+  "vision_input_modalities": [
+    "image"
+  ],
+  "audio_input_modalities": [
+    "audio"
+  ]
+}

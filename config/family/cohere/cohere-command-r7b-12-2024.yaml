@@ -1,0 +1,21 @@
+model:
+  id: command-r7b-12-2024
+  name: "Cohere: Command R7B (12-2024)"
+  lab: cohere
+  family: command
+  service: openrouter
+
+capabilities:
+  context_window: 128000
+  max_output_tokens: 4000
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0000375
+  output_per_1k_tokens: 0.00015

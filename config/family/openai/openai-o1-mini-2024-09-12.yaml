@@ -1,0 +1,21 @@
+model:
+  id: o1-mini-2024-09-12
+  name: "OpenAI: o1-mini (2024-09-12)"
+  lab: openai
+  family: o1
+  service: openai
+
+capabilities:
+  context_window: 128000
+  max_output_tokens: 65536
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0011
+  output_per_1k_tokens: 0.0044

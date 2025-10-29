@@ -1,0 +1,21 @@
+model:
+  id: l3-euryale-70b
+  name: "Sao10k: Llama 3 Euryale 70B v2.1"
+  lab: sao10k
+  family: l3
+  service: openrouter
+
+capabilities:
+  context_window: 8192
+  max_output_tokens: 8192
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00148
+  output_per_1k_tokens: 0.00148

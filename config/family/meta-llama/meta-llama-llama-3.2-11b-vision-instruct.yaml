@@ -1,0 +1,21 @@
+model:
+  id: llama-3.2-11b-vision-instruct
+  name: "Meta: Llama 3.2 11B Vision Instruct"
+  lab: meta-llama
+  family: llama
+  service: openrouter
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 16384
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.000049000000000000005
+  output_per_1k_tokens: 0.000049000000000000005

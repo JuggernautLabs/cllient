@@ -1,0 +1,21 @@
+model:
+  id: longcat-flash-chat
+  name: "Meituan: LongCat Flash Chat"
+  lab: meituan
+  family: longcat
+  service: openrouter
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 131072
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00015
+  output_per_1k_tokens: 0.00075

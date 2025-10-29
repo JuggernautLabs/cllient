@@ -1,0 +1,21 @@
+model:
+  id: glm-4.1v-9b-thinking
+  name: "THUDM: GLM 4.1V 9B Thinking"
+  lab: thudm
+  family: glm
+  service: openrouter
+
+capabilities:
+  context_window: 65536
+  max_output_tokens: 8000
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.000035000000000000004
+  output_per_1k_tokens: 0.000138

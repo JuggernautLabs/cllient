@@ -1,0 +1,29 @@
+model:
+  id: claude-opus-4-1-20250805
+  family: claude
+  name: Claude Opus 4.1 (Aug 2025)
+  version: "4.1"
+  variant: opus
+  service: anthropic
+
+  status: verified
+capabilities:
+  context_window: 200000
+  max_output_tokens: 32000
+  vision: true
+  functions: true
+  streaming: true
+  json_mode: false
+  system_prompt: true
+  multimodal: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.015
+  output_per_1k_tokens: 0.075
+  cached_input_per_1k_tokens: 0.0075
+
+defaults:
+  temperature: 1.0
+  max_tokens: 32000
+  top_p: 1.0

@@ -1,0 +1,21 @@
+model:
+  id: gemini-2.5-flash-lite-preview-09-2025
+  name: "Google: Gemini 2.5 Flash Lite Preview 09-2025"
+  lab: google
+  family: gemini
+  service: google
+
+capabilities:
+  context_window: 1048576
+  max_output_tokens: 65536
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00009999999999999999
+  output_per_1k_tokens: 0.00039999999999999996

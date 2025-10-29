@@ -1,0 +1,21 @@
+model:
+  id: gemini-2.0-flash-lite-001
+  name: "Google: Gemini 2.0 Flash Lite"
+  lab: google
+  family: gemini
+  service: google
+
+capabilities:
+  context_window: 1048576
+  max_output_tokens: 8192
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.000075
+  output_per_1k_tokens: 0.0003

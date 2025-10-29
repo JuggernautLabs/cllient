@@ -1,0 +1,36 @@
+model:
+  id: deepseek-v3
+  family: deepseek
+  name: DeepSeek V3
+  version: "3"
+  variant: base
+  service: deepseek
+
+capabilities:
+  context_window: 64000
+  max_output_tokens: 8192
+  vision: false
+  functions: true
+  streaming: true
+  json_mode: true
+  system_prompt: true
+  multimodal: false
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00027
+  output_per_1k_tokens: 0.0011
+  # Still very competitive even for the larger model
+
+defaults:
+  temperature: 1.0
+  max_tokens: 4096
+  top_p: 1.0
+  frequency_penalty: 0.0
+  presence_penalty: 0.0
+
+# DeepSeek-specific options
+deepseek_options:
+  reasoning_effort: "medium"  # low, medium, high
+  beta_features: true
+

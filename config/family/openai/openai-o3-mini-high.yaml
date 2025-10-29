@@ -1,0 +1,21 @@
+model:
+  id: o3-mini-high
+  name: "OpenAI: o3 Mini High"
+  lab: openai
+  family: o3
+  service: openai
+
+capabilities:
+  context_window: 200000
+  max_output_tokens: 100000
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0011
+  output_per_1k_tokens: 0.0044

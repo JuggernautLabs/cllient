@@ -1,0 +1,21 @@
+model:
+  id: nova-lite-v1
+  name: "Amazon: Nova Lite 1.0"
+  lab: amazon
+  family: nova
+  service: openrouter
+
+capabilities:
+  context_window: 300000
+  max_output_tokens: 5120
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.000059999999999999995
+  output_per_1k_tokens: 0.00023999999999999998

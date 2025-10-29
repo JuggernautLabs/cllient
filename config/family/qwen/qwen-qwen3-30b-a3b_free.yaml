@@ -1,0 +1,21 @@
+model:
+  id: qwen3-30b-a3b:free
+  name: "Qwen: Qwen3 30B A3B (free)"
+  lab: qwen
+  family: qwen
+  service: openrouter
+
+capabilities:
+  context_window: 40960
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0
+  output_per_1k_tokens: 0.0

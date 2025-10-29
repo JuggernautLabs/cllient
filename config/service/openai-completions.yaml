@@ -1,0 +1,55 @@
+service:
+  name: OpenAI Completions
+  base_url: https://api.openai.com
+
+http:
+  request: |
+    POST /v1/completions HTTP/1.1
+    Host: api.openai.com
+    Content-Type: application/json
+    Authorization: Bearer ${OPENAI_API_KEY}
+
+    {
+      "model": "{{model_id}}",
+      "prompt": "{{messages_as_text}}",
+      "temperature": {{temperature}},
+      "max_tokens": {{max_tokens}},
+      "stream": {{stream}}
+    }
+
+streaming:
+  format: text/event-stream
+  parser: openai_sse
+  line_prefix: "data: "
+  done_marker: "[DONE]"
+  events:
+    - type: data
+      extract: choices[0].text
+      action: content
+      filter: choices[0].text
+    - type: data
+      extract: choices[0].finish_reason
+      action: finish
+      filter: choices[0].finish_reason
+
+response:
+  success_codes: [200]
+  extract:
+    content: choices[0].text
+    finish_reason: choices[0].finish_reason
+    usage:
+      input: usage.prompt_tokens
+      output: usage.completion_tokens
+      total: usage.total_tokens
+  error:
+    message: error.message
+    type: error.type
+    code: error.code
+    param: error.param
+
+message_builder: openai
+
+rate_limits:
+  requests_per_minute: 500
+  tokens_per_minute: 10000
+  concurrent_requests: 10

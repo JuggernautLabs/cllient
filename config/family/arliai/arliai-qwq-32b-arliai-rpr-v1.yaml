@@ -1,0 +1,21 @@
+model:
+  id: qwq-32b-arliai-rpr-v1
+  name: "ArliAI: QwQ 32B RpR v1"
+  lab: arliai
+  family: qwq
+  service: openrouter
+
+capabilities:
+  context_window: 32768
+  max_output_tokens: 32768
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.000029999999999999997
+  output_per_1k_tokens: 0.00011

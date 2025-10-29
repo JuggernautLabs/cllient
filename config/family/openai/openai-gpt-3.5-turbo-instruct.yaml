@@ -1,0 +1,26 @@
+model:
+  id: gpt-3.5-turbo-instruct
+  name: "OpenAI: GPT-3.5 Turbo Instruct"
+  lab: openai
+  family: gpt
+  service: openai-completions
+
+capabilities:
+  context_window: 4095
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0015
+  output_per_1k_tokens: 0.002
+
+defaults:
+  temperature: 1.0
+  max_tokens: 4096
+  top_p: 1.0

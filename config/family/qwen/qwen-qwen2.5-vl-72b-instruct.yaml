@@ -1,0 +1,21 @@
+model:
+  id: qwen2.5-vl-72b-instruct
+  name: "Qwen: Qwen2.5 VL 72B Instruct"
+  lab: qwen
+  family: qwen
+  service: openrouter
+
+capabilities:
+  context_window: 32768
+  max_output_tokens: 32768
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00008
+  output_per_1k_tokens: 0.00033

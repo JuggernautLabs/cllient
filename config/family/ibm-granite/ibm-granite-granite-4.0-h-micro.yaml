@@ -1,0 +1,21 @@
+model:
+  id: granite-4.0-h-micro
+  name: "IBM: Granite 4.0 Micro"
+  lab: ibm-granite
+  family: granite
+  service: openrouter
+
+capabilities:
+  context_window: 131000
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.000017
+  output_per_1k_tokens: 0.00011

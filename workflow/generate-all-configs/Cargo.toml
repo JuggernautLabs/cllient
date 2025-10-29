@@ -1,0 +1,26 @@
+[package]
+name = "generate-all-configs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Core dependencies
+cllient = { path = "../.." }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Template engine
+handlebars = "4.5"
+
+# Error handling
+anyhow = "1.0"
+
+# File operations
+walkdir = "2.4"
+
+# Command line argument parsing
+clap = { version = "4.0", features = ["derive"] }
+
+# Pattern matching
+glob = "0.3"
+regex = "1.10"

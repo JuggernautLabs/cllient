@@ -1,0 +1,21 @@
+model:
+  id: ministral-8b
+  name: "Mistral: Ministral 8B"
+  lab: mistralai
+  family: mistral
+  service: openrouter
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00009999999999999999
+  output_per_1k_tokens: 0.00009999999999999999

@@ -1,0 +1,21 @@
+model:
+  id: qwen2.5-vl-32b-instruct:free
+  name: "Qwen: Qwen2.5 VL 32B Instruct (free)"
+  lab: qwen
+  family: qwen
+  service: openrouter
+
+capabilities:
+  context_window: 16384
+  max_output_tokens: 4096
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0
+  output_per_1k_tokens: 0.0

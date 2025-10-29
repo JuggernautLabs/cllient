@@ -1,0 +1,21 @@
+model:
+  id: nova-pro-v1
+  name: "Amazon: Nova Pro 1.0"
+  lab: amazon
+  family: nova
+  service: openrouter
+
+capabilities:
+  context_window: 300000
+  max_output_tokens: 5120
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0007999999999999999
+  output_per_1k_tokens: 0.0031999999999999997

@@ -1,0 +1,68 @@
+service:
+  name: Anthropic
+  base_url: https://api.anthropic.com
+
+http:
+  request: |
+    POST /v1/messages HTTP/1.1
+    Host: api.anthropic.com
+    Content-Type: application/json
+    anthropic-version: 2023-06-01
+    x-api-key: ${ANTHROPIC_API_KEY}
+
+    {
+      "model": "{{model_id}}",
+      "messages": {{json messages}},
+      "system": "{{system}}",
+      "max_tokens": {{max_tokens}},
+      "temperature": {{temperature}},
+      "stream": {{stream}}
+    }
+
+streaming:
+  format: text/event-stream
+  parser: anthropic_sse
+  events:
+    - type: message_start
+      extract: message
+      action: start
+    - type: content_block_start
+      extract: content_block
+      action: content_start
+    - type: content_block_delta
+      extract: delta.text
+      action: content
+    - type: content_block_stop
+      extract: content_block
+      action: content_stop
+    - type: message_delta
+      extract: delta.usage
+      action: usage_update
+    - type: message_stop
+      extract: message
+      action: stop
+    - type: error
+      extract: error
+      action: error
+
+response:
+  success_codes: [200]
+  extract:
+    content: content[0].text
+    role: role
+    finish_reason: stop_reason
+    usage:
+      input: usage.input_tokens
+      output: usage.output_tokens
+  error:
+    message: error.message
+    type: error.type
+    code: error.code
+
+message_builder: anthropic
+
+# Rate limiting based on Anthropic's limits
+rate_limits:
+  requests_per_minute: 50
+  tokens_per_minute: 40000
+  concurrent_requests: 5

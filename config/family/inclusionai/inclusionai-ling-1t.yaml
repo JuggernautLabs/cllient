@@ -1,0 +1,21 @@
+model:
+  id: ling-1t
+  name: "inclusionAI: Ling-1T"
+  lab: inclusionai
+  family: ling
+  service: openrouter
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 131072
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0005700000000000001
+  output_per_1k_tokens: 0.0022800000000000003

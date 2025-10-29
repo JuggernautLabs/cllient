@@ -1,0 +1,21 @@
+model:
+  id: qwen-plus
+  name: "Qwen: Qwen-Plus"
+  lab: qwen
+  family: qwen
+  service: openrouter
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 8192
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00039999999999999996
+  output_per_1k_tokens: 0.0012

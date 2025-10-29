@@ -1,0 +1,21 @@
+model:
+  id: magnum-v4-72b
+  name: "Magnum v4 72B"
+  lab: anthracite-org
+  family: magnum
+  service: openrouter
+
+capabilities:
+  context_window: 16384
+  max_output_tokens: 2048
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.003
+  output_per_1k_tokens: 0.005

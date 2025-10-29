@@ -1,0 +1,21 @@
+model:
+  id: cogito-v2-preview-llama-70b
+  name: "Deep Cogito: Cogito V2 Preview Llama 70B"
+  lab: deepcogito
+  family: cogito
+  service: openrouter
+
+capabilities:
+  context_window: 32768
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00088
+  output_per_1k_tokens: 0.00088

@@ -1,0 +1,29 @@
+model:
+  id: claude-sonnet-4-20250514
+  family: claude
+  name: Claude Sonnet 4 (May 2025)
+  version: "4"
+  variant: sonnet
+  service: anthropic
+
+  status: verified
+capabilities:
+  context_window: 1000000
+  max_output_tokens: 64000
+  vision: true
+  functions: true
+  streaming: true
+  json_mode: false
+  system_prompt: true
+  multimodal: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.003
+  output_per_1k_tokens: 0.015
+  cached_input_per_1k_tokens: 0.0015
+
+defaults:
+  temperature: 1.0
+  max_tokens: 64000
+  top_p: 1.0

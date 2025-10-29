@@ -1,0 +1,21 @@
+model:
+  id: llama-3.1-405b
+  name: "Meta: Llama 3.1 405B (base)"
+  lab: meta-llama
+  family: llama
+  service: openrouter
+
+capabilities:
+  context_window: 32768
+  max_output_tokens: 32768
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.004
+  output_per_1k_tokens: 0.004

@@ -1,0 +1,21 @@
+model:
+  id: dolphin3.0-mistral-24b
+  name: "Dolphin3.0 Mistral 24B"
+  lab: cognitivecomputations
+  family: dolphin3.0
+  service: openrouter
+
+capabilities:
+  context_window: 32768
+  max_output_tokens: 32768
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00004
+  output_per_1k_tokens: 0.00016999999999999999

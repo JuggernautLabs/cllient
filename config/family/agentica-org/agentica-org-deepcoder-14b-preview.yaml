@@ -1,0 +1,21 @@
+model:
+  id: deepcoder-14b-preview
+  name: "Agentica: Deepcoder 14B Preview"
+  lab: agentica-org
+  family: deepcoder
+  service: openrouter
+
+capabilities:
+  context_window: 96000
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.000014999999999999999
+  output_per_1k_tokens: 0.000014999999999999999

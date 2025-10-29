@@ -1,0 +1,21 @@
+model:
+  id: aion-1.0-mini
+  name: "AionLabs: Aion-1.0-Mini"
+  lab: aion-labs
+  family: aion
+  service: openrouter
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 32768
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0007
+  output_per_1k_tokens: 0.0014

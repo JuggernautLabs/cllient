@@ -1,0 +1,21 @@
+model:
+  id: llama-4-scout:free
+  name: "Meta: Llama 4 Scout (free)"
+  lab: meta-llama
+  family: llama
+  service: openrouter
+
+capabilities:
+  context_window: 128000
+  max_output_tokens: 4028
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0
+  output_per_1k_tokens: 0.0

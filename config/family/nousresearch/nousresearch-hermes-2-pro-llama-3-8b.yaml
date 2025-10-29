@@ -1,0 +1,21 @@
+model:
+  id: hermes-2-pro-llama-3-8b
+  name: "NousResearch: Hermes 2 Pro - Llama-3 8B"
+  lab: nousresearch
+  family: hermes
+  service: openrouter
+
+capabilities:
+  context_window: 32768
+  max_output_tokens: 4096
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.000024999999999999998
+  output_per_1k_tokens: 0.00008

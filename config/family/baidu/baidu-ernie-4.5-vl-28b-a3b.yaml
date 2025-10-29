@@ -1,0 +1,21 @@
+model:
+  id: ernie-4.5-vl-28b-a3b
+  name: "Baidu: ERNIE 4.5 VL 28B A3B"
+  lab: baidu
+  family: ernie
+  service: openrouter
+
+capabilities:
+  context_window: 30000
+  max_output_tokens: 8000
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00014000000000000001
+  output_per_1k_tokens: 0.0005600000000000001

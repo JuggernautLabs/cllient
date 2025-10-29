@@ -1,0 +1,21 @@
+model:
+  id: llama-guard-4-12b
+  name: "Meta: Llama Guard 4 12B"
+  lab: meta-llama
+  family: llama
+  service: openrouter
+
+capabilities:
+  context_window: 163840
+  max_output_tokens: 4096
+  multimodal: true
+  vision: true
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00017999999999999998
+  output_per_1k_tokens: 0.00017999999999999998

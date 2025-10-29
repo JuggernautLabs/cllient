@@ -1,0 +1,21 @@
+model:
+  id: glm-4.5-air
+  name: "Z.AI: GLM 4.5 Air"
+  lab: z-ai
+  family: glm
+  service: openrouter
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 98304
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.00013
+  output_per_1k_tokens: 0.0008500000000000001

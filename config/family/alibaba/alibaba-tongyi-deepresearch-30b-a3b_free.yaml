@@ -1,0 +1,21 @@
+model:
+  id: tongyi-deepresearch-30b-a3b:free
+  name: "Tongyi DeepResearch 30B A3B (free)"
+  lab: alibaba
+  family: tongyi
+  service: openrouter
+
+capabilities:
+  context_window: 131072
+  max_output_tokens: 131072
+  multimodal: false
+  vision: false
+  functions: false
+  json_mode: false
+  streaming: true
+  system_prompt: true
+
+pricing:
+  currency: USD
+  input_per_1k_tokens: 0.0
+  output_per_1k_tokens: 0.0
