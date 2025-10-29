@@ -2,6 +2,7 @@ pub mod config;
 pub mod embedded_config;
 pub mod client;
 pub mod streaming;
+pub mod streaming_json;
 pub mod template;
 pub mod error;
 pub mod types;

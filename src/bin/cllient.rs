@@ -1,5 +1,6 @@
 use cllient::{EmbeddedClientFactory, FileBasedClientFactory, ConfigLoader, EmbeddedConfigLoader, LowLevelClient, CompletionRequest, ClientFactory, ConfigProvider};
 use cllient::streaming::StreamEvent;
+use cllient::streaming_json::StreamingJsonObject;
 use futures::StreamExt as FuturesStreamExt;
 use std::env;
 use std::io::{self, Write};
@@ -485,22 +486,29 @@ async fn stream_model<T: ConfigProvider>(
     prompt: &str,
     json_output: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use serde_json::json;
-    
     let client = factory.create_client(model_id)?;
     
     if json_output {
-        // For JSON output, collect all chunks and return complete response
+        // Stream JSON structure as it's being built!
+        let mut json_obj = StreamingJsonObject::new()?;
+
+        json_obj.field_string("model", model_id)?;
+        json_obj.field_string("prompt", prompt)?;
+
         let request = CompletionRequest::text("user", prompt).with_streaming(true);
         let mut stream = client.complete_stream(&request).await?;
-        let mut full_response = String::new();
+
+        // Start streaming the response field
+        let mut response_writer = json_obj.field_streaming_string("response")?;
+
         let mut error_occurred = false;
         let mut error_message = String::new();
-        
+
         while let Some(event_result) = FuturesStreamExt::next(&mut stream).await {
             match event_result {
                 Ok(StreamEvent::Content(chunk)) => {
-                    full_response.push_str(&chunk);
+                    // Stream each chunk directly to the JSON output!
+                    response_writer.write_chunk(&chunk)?;
                 },
                 Ok(_) => {}, // Ignore other events for now
                 Err(e) => {
@@ -510,26 +518,22 @@ async fn stream_model<T: ConfigProvider>(
                 }
             }
         }
-        
+
+        // Close the streaming response field
+        response_writer.close()?;
+
+        // Add remaining fields
+        json_obj.field_bool("streamed", true)?;
+
         if error_occurred {
-            let result = json!({
-                "model": model_id,
-                "prompt": prompt,
-                "success": false,
-                "error": error_message,
-                "type": "stream_error"
-            });
-            println!("{}", serde_json::to_string_pretty(&result).unwrap());
+            json_obj.field_bool("success", false)?;
+            json_obj.field_string("error", &error_message)?;
         } else {
-            let result = json!({
-                "model": model_id,
-                "prompt": prompt,
-                "response": full_response,
-                "success": true,
-                "streamed": true
-            });
-            println!("{}", serde_json::to_string_pretty(&result).unwrap());
+            json_obj.field_bool("success", true)?;
         }
+
+        // Close the JSON object
+        json_obj.close()?;
     } else {
         // Original streaming output
         println!("🤖 Model: {}", model_id);
