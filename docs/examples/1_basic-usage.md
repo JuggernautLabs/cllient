@@ -100,7 +100,7 @@ async fn main() -> Result<(), ClientError> {
     let response = registry
         .from_id("gpt-4o-mini")?
         .prompt("Hello, world!")
-        .complete()
+        .send()
         .await?;
     
     println!("Response: {}", response.content);
@@ -121,14 +121,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cheap_response = registry
         .use_cheapest("claude-*")?
         .prompt("Simple question: what is 2+2?")
-        .complete()
+        .send()
         .await?;
     
     // Use fastest model for quick tasks
     let fast_response = registry
         .use_fastest(".*")?
         .prompt("Quick calculation")
-        .complete()
+        .send()
         .await?;
     
     println!("Cheap: {}", cheap_response.content);
@@ -177,7 +177,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .prompt("Write a creative story")
         .temperature(0.8)      // More creative
         .max_tokens(1000)      // Longer response
-        .complete()
+        .send()
         .await?;
     
     println!("Story: {}", response.content);

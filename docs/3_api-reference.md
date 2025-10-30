@@ -59,7 +59,7 @@ async fn main() -> Result<(), ClientError> {
     let response = registry
         .from_id("gpt-4o-mini")?
         .prompt("Hello, world!")
-        .complete()
+        .send()
         .await?;
     
     println!("Response: {}", response.content);
@@ -77,7 +77,7 @@ async fn main() -> Result<(), ClientError> {
 let response = registry
     .from_id("claude-3-haiku-20240307")?
     .prompt("Explain quantum computing")
-    .complete()
+    .send()
     .await?;
 ```
 
@@ -88,14 +88,14 @@ let response = registry
 let response = registry
     .use_cheapest("claude-*")?
     .prompt("Write a haiku")
-    .complete()
+    .send()
     .await?;
 
 // Find cheapest GPT model
 let response = registry
     .use_cheapest("gpt-*")?
     .prompt("Explain AI")
-    .complete()
+    .send()
     .await?;
 ```
 
@@ -105,7 +105,7 @@ let response = registry
 let response = registry
     .use_fastest("deepseek-*")?
     .prompt("Quick calculation: 2+2")
-    .complete()
+    .send()
     .await?;
 ```
 
@@ -121,7 +121,7 @@ let response = registry
     .prompt("Explain machine learning")
     .temperature(0.7)
     .max_tokens(1000)
-    .complete()
+    .send()
     .await?;
 ```
 
@@ -544,7 +544,7 @@ async fn test_runtime_api() {
     let response = registry
         .from_id("gpt-4o-mini").unwrap()
         .prompt("Hello, world!")
-        .complete()
+        .send()
         .await
         .unwrap();
     

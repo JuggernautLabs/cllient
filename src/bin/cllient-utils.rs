@@ -143,7 +143,8 @@ async fn test_model_with_runtime(model: &str) -> Result<String, Box<dyn std::err
     
     let runtime = ModelRegistry::new()?;
     let mut stream = runtime.from_id(model)?
-        .stream("respond with just hi")
+        .prompt("respond with just hi")
+        .stream()
         .await?;
     
     let mut response_parts = Vec::new();

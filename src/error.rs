@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, ClientError>;
+pub type Error = ClientError;
 
 #[derive(Error, Debug)]
 pub enum ClientError {
@@ -39,9 +40,12 @@ pub enum ClientError {
     
     #[error("Invalid model: {0}")]
     InvalidModel(String),
-    
+
     #[error("Invalid service: {0}")]
     InvalidService(String),
+
+    #[error("Validation error: {0}")]
+    ValidationError(String),
 }
 
 #[derive(Error, Debug)]

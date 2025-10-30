@@ -168,7 +168,7 @@ async fn test_runtime_async_completion() {
         .unwrap()
         .max_tokens(10)
         .temperature(0.0)
-        .send("What is 5+5? Answer with just the number.")
+        .send_text("What is 5+5? Answer with just the number.")
         .await;
     
     assert!(response.is_ok(), "Failed to complete request");
@@ -193,7 +193,8 @@ async fn test_runtime_streaming() {
         .from_id("deepseek-chat")
         .unwrap()
         .max_tokens(50)
-        .stream("Count to 3")
+        .prompt("Count to 3")
+        .stream()
         .await
         .unwrap();
     

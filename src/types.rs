@@ -59,15 +59,25 @@ impl CompletionRequest {
 #[derive(Debug, Clone)]
 pub enum MessageContent {
     /// Plain text content
-    Text { 
-        role: String, 
-        content: String 
+    Text {
+        role: String,
+        content: String
     },
     /// Multimodal message with mixed content
     Multimodal {
         role: String,
         content: Vec<ContentBlock>
     },
+}
+
+impl MessageContent {
+    /// Get the role of this message
+    pub fn role(&self) -> &str {
+        match self {
+            MessageContent::Text { role, .. } => role,
+            MessageContent::Multimodal { role, .. } => role,
+        }
+    }
 }
 
 /// Individual content blocks within a message
@@ -272,6 +282,459 @@ impl DocumentFormat {
     }
 }
 
+/// A list structure for managing messages with modification capabilities
+#[derive(Debug, Clone, Default)]
+pub struct MessageList {
+    messages: Vec<Message>,
+}
+
+impl MessageList {
+    /// Create a new empty message list
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::MessageList;
+    /// let msgs = MessageList::new();
+    /// ```
+    pub fn new() -> Self {
+        Self {
+            messages: Vec::new(),
+        }
+    }
+
+    /// Create a new message list with pre-allocated capacity
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::MessageList;
+    /// let msgs = MessageList::with_capacity(10);
+    /// ```
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            messages: Vec::with_capacity(capacity),
+        }
+    }
+
+    /// Create a message list from an existing Vec<Message>
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::{MessageList, Message};
+    /// let msgs = MessageList::from_vec(vec![
+    ///     Message::user("Hello"),
+    ///     Message::assistant("Hi!"),
+    /// ]);
+    /// ```
+    pub fn from_vec(messages: Vec<Message>) -> Self {
+        Self { messages }
+    }
+
+    /// Add a message to the end of the list
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::{MessageList, Message};
+    /// let mut msgs = MessageList::new();
+    /// msgs.push(Message::user("Hello"));
+    /// msgs.push(Message::assistant("Hi!"));
+    /// ```
+    pub fn push(&mut self, message: Message) {
+        self.messages.push(message);
+    }
+
+    /// Get a reference to a message at the specified index
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::{MessageList, Message};
+    /// let mut msgs = MessageList::new();
+    /// msgs.push(Message::user("Hello"));
+    /// assert_eq!(msgs.get(0).unwrap().role(), "user");
+    /// ```
+    pub fn get(&self, index: usize) -> Option<&Message> {
+        self.messages.get(index)
+    }
+
+    /// Get a mutable reference to a message at the specified index
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::{MessageList, Message};
+    /// let mut msgs = MessageList::new();
+    /// msgs.push(Message::user("Hello"));
+    /// if let Some(msg) = msgs.get_mut(0) {
+    ///     // Can modify the message
+    /// }
+    /// ```
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut Message> {
+        self.messages.get_mut(index)
+    }
+
+    /// Replace a message at the specified index, returning the old message
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::{MessageList, Message};
+    /// let mut msgs = MessageList::new();
+    /// msgs.push(Message::user("Hello"));
+    /// let old = msgs.set(0, Message::user("Hi"));
+    /// assert!(old.is_some());
+    /// ```
+    pub fn set(&mut self, index: usize, message: Message) -> Option<Message> {
+        if index < self.messages.len() {
+            Some(std::mem::replace(&mut self.messages[index], message))
+        } else {
+            None
+        }
+    }
+
+    /// Remove a message at the specified index, returning it
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::{MessageList, Message};
+    /// let mut msgs = MessageList::new();
+    /// msgs.push(Message::user("Hello"));
+    /// msgs.push(Message::assistant("Hi!"));
+    /// let removed = msgs.remove(0);
+    /// assert!(removed.is_some());
+    /// assert_eq!(msgs.len(), 1);
+    /// ```
+    pub fn remove(&mut self, index: usize) -> Option<Message> {
+        if index < self.messages.len() {
+            Some(self.messages.remove(index))
+        } else {
+            None
+        }
+    }
+
+    /// Insert a message at the specified index
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::{MessageList, Message};
+    /// let mut msgs = MessageList::new();
+    /// msgs.push(Message::user("Hello"));
+    /// msgs.push(Message::assistant("Hi!"));
+    /// msgs.insert(1, Message::system("Be helpful"));
+    /// assert_eq!(msgs.len(), 3);
+    /// ```
+    pub fn insert(&mut self, index: usize, message: Message) {
+        self.messages.insert(index, message);
+    }
+
+    /// Clear all messages and return them as a Vec
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::{MessageList, Message};
+    /// let mut msgs = MessageList::new();
+    /// msgs.push(Message::user("Hello"));
+    /// msgs.push(Message::assistant("Hi!"));
+    /// let all_messages = msgs.clear();
+    /// assert_eq!(all_messages.len(), 2);
+    /// assert_eq!(msgs.len(), 0);
+    /// ```
+    pub fn clear(&mut self) -> Vec<Message> {
+        std::mem::take(&mut self.messages)
+    }
+
+    /// Get the number of messages in the list
+    pub fn len(&self) -> usize {
+        self.messages.len()
+    }
+
+    /// Check if the message list is empty
+    pub fn is_empty(&self) -> bool {
+        self.messages.is_empty()
+    }
+
+    /// Get an iterator over the messages
+    pub fn iter(&self) -> impl Iterator<Item = &Message> {
+        self.messages.iter()
+    }
+
+    /// Get an mutable iterator over the messages
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Message> {
+        self.messages.iter_mut()
+    }
+
+    /// Get a slice of all messages
+    pub fn as_slice(&self) -> &[Message] {
+        &self.messages
+    }
+
+    /// Convert the message list into a Vec<Message>, consuming self
+    pub fn into_vec(self) -> Vec<Message> {
+        self.messages
+    }
+
+    /// Clone the messages into a new Vec
+    pub fn to_vec(&self) -> Vec<Message> {
+        self.messages.clone()
+    }
+
+    /// Extend the message list with messages from an iterator
+    pub fn extend<I: IntoIterator<Item = Message>>(&mut self, iter: I) {
+        self.messages.extend(iter);
+    }
+
+    /// Retain only the messages that satisfy the predicate
+    pub fn retain<F>(&mut self, f: F)
+    where
+        F: FnMut(&Message) -> bool,
+    {
+        self.messages.retain(f);
+    }
+}
+
+impl From<Vec<Message>> for MessageList {
+    fn from(messages: Vec<Message>) -> Self {
+        Self { messages }
+    }
+}
+
+impl From<MessageList> for Vec<Message> {
+    fn from(list: MessageList) -> Self {
+        list.messages
+    }
+}
+
+impl IntoIterator for MessageList {
+    type Item = Message;
+    type IntoIter = std::vec::IntoIter<Message>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.messages.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a MessageList {
+    type Item = &'a Message;
+    type IntoIter = std::slice::Iter<'a, Message>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.messages.iter()
+    }
+}
+
+impl std::ops::Index<usize> for MessageList {
+    type Output = Message;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.messages[index]
+    }
+}
+
+impl std::ops::IndexMut<usize> for MessageList {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.messages[index]
+    }
+}
+
+/// Builder for constructing messages with specific roles and content
+#[derive(Debug, Clone)]
+pub struct Message {
+    role: String,
+    content: Vec<ContentBlock>,
+}
+
+impl Message {
+    /// Create a message from the user role
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::Message;
+    /// let msg = Message::user("Hello, how are you?");
+    /// ```
+    pub fn user(text: &str) -> Self {
+        Self {
+            role: "user".to_string(),
+            content: vec![ContentBlock::text(text)],
+        }
+    }
+
+    /// Create a message from the assistant role
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::Message;
+    /// let msg = Message::assistant("I'm doing great, thanks!");
+    /// ```
+    pub fn assistant(text: &str) -> Self {
+        Self {
+            role: "assistant".to_string(),
+            content: vec![ContentBlock::text(text)],
+        }
+    }
+
+    /// Create a message from the system role
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::Message;
+    /// let msg = Message::system("You are a helpful assistant.");
+    /// ```
+    pub fn system(text: &str) -> Self {
+        Self {
+            role: "system".to_string(),
+            content: vec![ContentBlock::text(text)],
+        }
+    }
+
+    /// Create a message with a custom role
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::Message;
+    /// let msg = Message::custom("elmo").add_text("Elmo loves to help!");
+    /// ```
+    pub fn custom(role: &str) -> Self {
+        Self {
+            role: role.to_string(),
+            content: vec![],
+        }
+    }
+
+    /// Create a user message with multimodal content
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::{Message, ContentBlock, ImageFormat};
+    /// let image_data = vec![0xFF, 0xD8, 0xFF]; // JPEG data
+    /// let msg = Message::user_multimodal(vec![
+    ///     ContentBlock::text("What's in this image?"),
+    ///     ContentBlock::image(image_data, ImageFormat::Jpeg),
+    /// ]);
+    /// ```
+    pub fn user_multimodal(content: Vec<ContentBlock>) -> Self {
+        Self {
+            role: "user".to_string(),
+            content,
+        }
+    }
+
+    /// Add text content to the message
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::Message;
+    /// let msg = Message::custom("narrator")
+    ///     .add_text("Once upon a time...")
+    ///     .add_text("in a galaxy far away...");
+    /// ```
+    pub fn add_text(mut self, text: &str) -> Self {
+        self.content.push(ContentBlock::text(text));
+        self
+    }
+
+    /// Add an image to the message
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::{Message, ImageFormat};
+    /// let image_data = std::fs::read("photo.jpg").unwrap();
+    /// let msg = Message::user("Check this out")
+    ///     .add_image(image_data, ImageFormat::Jpeg);
+    /// ```
+    pub fn add_image(mut self, data: Vec<u8>, format: ImageFormat) -> Self {
+        self.content.push(ContentBlock::image(data, format));
+        self
+    }
+
+    /// Add an image from a URL
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::Message;
+    /// let msg = Message::user("What's in this image?")
+    ///     .add_image_url("https://example.com/photo.jpg");
+    /// ```
+    pub fn add_image_url(mut self, url: &str) -> Self {
+        self.content.push(ContentBlock::image_url(url));
+        self
+    }
+
+    /// Add audio content to the message
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::{Message, AudioFormat};
+    /// let audio_data = std::fs::read("recording.wav").unwrap();
+    /// let msg = Message::user("Transcribe this")
+    ///     .add_audio(audio_data, AudioFormat::Wav, Some("recording.wav".to_string()));
+    /// ```
+    pub fn add_audio(mut self, data: Vec<u8>, format: AudioFormat, filename: Option<String>) -> Self {
+        self.content.push(ContentBlock::audio(data, format, filename));
+        self
+    }
+
+    /// Add a document to the message
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::{Message, DocumentFormat};
+    /// let pdf_data = std::fs::read("document.pdf").unwrap();
+    /// let msg = Message::user("Summarize this document")
+    ///     .add_document(pdf_data, DocumentFormat::Pdf, Some("document.pdf".to_string()));
+    /// ```
+    pub fn add_document(mut self, data: Vec<u8>, format: DocumentFormat, filename: Option<String>) -> Self {
+        self.content.push(ContentBlock::document(data, format, filename));
+        self
+    }
+
+    /// Add a content block to the message
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::{Message, ContentBlock};
+    /// let msg = Message::user("Hello")
+    ///     .add_content(ContentBlock::text("World"));
+    /// ```
+    pub fn add_content(mut self, block: ContentBlock) -> Self {
+        self.content.push(block);
+        self
+    }
+
+    /// Set the content blocks directly (replaces existing content)
+    ///
+    /// # Examples
+    /// ```
+    /// use cllient::{Message, ContentBlock};
+    /// let msg = Message::custom("narrator")
+    ///     .content(vec![
+    ///         ContentBlock::text("Chapter 1"),
+    ///         ContentBlock::text("The Beginning"),
+    ///     ]);
+    /// ```
+    pub fn content(mut self, blocks: Vec<ContentBlock>) -> Self {
+        self.content = blocks;
+        self
+    }
+
+    /// Convert the message into MessageContent for internal use
+    pub(crate) fn into_message_content(self) -> MessageContent {
+        if self.content.len() == 1 {
+            if let ContentBlock::Text(text) = &self.content[0] {
+                return MessageContent::Text {
+                    role: self.role,
+                    content: text.clone(),
+                };
+            }
+        }
+
+        MessageContent::Multimodal {
+            role: self.role,
+            content: self.content,
+        }
+    }
+
+    /// Get the role of this message
+    pub fn role(&self) -> &str {
+        &self.role
+    }
+}
+
 /// Response from a completion request
 #[derive(Debug, Clone)]
 pub struct CompletionResponse {
@@ -358,17 +821,182 @@ impl RequestBuilder {
         self.request.parameters.insert(key.to_string(), value.into());
         self
     }
-    
-    /// Send a simple text message
-    pub async fn send(mut self, content: &str) -> crate::error::Result<CompletionResponse> {
-        // Create the message
+
+    /// Set the prompt text (convenience method for setting the user message)
+    /// This allows you to chain: `registry.from_id("gpt-4o-mini")?.prompt("Hello").send().await?`
+    pub fn prompt(mut self, content: &str) -> Self {
+        self.request.messages = vec![MessageContent::Text {
+            role: "user".to_string(),
+            content: content.to_string(),
+        }];
+        self
+    }
+
+    /// Append a message to the conversation
+    ///
+    /// This allows you to build multi-turn conversations with custom roles.
+    ///
+    /// # Examples
+    ///
+    /// ## Simple conversation
+    /// ```no_run
+    /// # use cllient::{ModelRegistry, Message};
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let registry = ModelRegistry::new()?;
+    /// let response = registry
+    ///     .from_id("gpt-4o-mini")?
+    ///     .append_message(Message::user("What is 2+2?"))
+    ///     .append_message(Message::assistant("4"))
+    ///     .append_message(Message::user("And what's 4+4?"))
+    ///     .send()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ## Custom roles
+    /// ```no_run
+    /// # use cllient::{ModelRegistry, Message};
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let registry = ModelRegistry::new()?;
+    /// let response = registry
+    ///     .from_id("claude-3-haiku-20240307")?
+    ///     .append_message(Message::custom("narrator").add_text("Once upon a time..."))
+    ///     .append_message(Message::custom("elmo").add_text("Elmo loves stories!"))
+    ///     .append_message(Message::user("Continue the story"))
+    ///     .send()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ## Multimodal content
+    /// ```no_run
+    /// # use cllient::{ModelRegistry, Message, ContentBlock, ImageFormat};
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let image_data = std::fs::read("photo.jpg")?;
+    /// let registry = ModelRegistry::new()?;
+    /// let response = registry
+    ///     .from_id("gpt-4o")?
+    ///     .append_message(
+    ///         Message::user("What's in this image?")
+    ///             .add_image(image_data, ImageFormat::Jpeg)
+    ///     )
+    ///     .send()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn append_message(mut self, message: Message) -> Self {
+        self.request.messages.push(message.into_message_content());
+        self
+    }
+
+    /// Set all messages at once from an array
+    ///
+    /// This replaces any previously set messages (including those from `.prompt()` or `.append_message()`).
+    ///
+    /// # Examples
+    ///
+    /// ## From a Vec
+    /// ```no_run
+    /// # use cllient::{ModelRegistry, Message};
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let registry = ModelRegistry::new()?;
+    ///
+    /// let conversation = vec![
+    ///     Message::system("You are a helpful assistant"),
+    ///     Message::user("What is 2+2?"),
+    ///     Message::assistant("4"),
+    ///     Message::user("And 4+4?"),
+    /// ];
+    ///
+    /// let response = registry
+    ///     .from_id("gpt-4o-mini")?
+    ///     .messages(conversation)
+    ///     .send()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ## Building a conversation dynamically
+    /// ```no_run
+    /// # use cllient::{ModelRegistry, Message};
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut msgs = vec![Message::system("You are a coding assistant")];
+    ///
+    /// // Add conversation history
+    /// for (role, text) in &[("user", "Explain Rust"), ("assistant", "Rust is...")] {
+    ///     msgs.push(if *role == "user" {
+    ///         Message::user(text)
+    ///     } else {
+    ///         Message::assistant(text)
+    ///     });
+    /// }
+    ///
+    /// msgs.push(Message::user("Tell me more"));
+    ///
+    /// let registry = ModelRegistry::new()?;
+    /// let response = registry
+    ///     .from_id("deepseek-chat")?
+    ///     .messages(msgs)
+    ///     .send()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ## With custom roles
+    /// ```no_run
+    /// # use cllient::{ModelRegistry, Message};
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let registry = ModelRegistry::new()?;
+    ///
+    /// let response = registry
+    ///     .from_id("claude-3-haiku-20240307")?
+    ///     .messages(vec![
+    ///         Message::custom("narrator").add_text("The scene opens..."),
+    ///         Message::custom("hero").add_text("I will save the day!"),
+    ///         Message::custom("villain").add_text("Not so fast!"),
+    ///         Message::user("Continue the story"),
+    ///     ])
+    ///     .send()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn messages<T: Into<Vec<Message>>>(mut self, messages: T) -> Self {
+        self.request.messages = messages
+            .into()
+            .into_iter()
+            .map(|m| m.into_message_content())
+            .collect();
+        self
+    }
+
+    /// Send the request with the configured messages
+    /// Use `.prompt("text")` before calling this to set the message, or use `.send_text("text")` as a shortcut
+    pub async fn send(self) -> crate::error::Result<CompletionResponse> {
+        if self.request.messages.is_empty() {
+            return Err(crate::error::Error::ValidationError(
+                "No messages set. Use .prompt(text) or .send_text(text) instead.".to_string()
+            ));
+        }
+
+        // Create client and send request
+        let client = crate::client::HttpClient::from_model_id(&*self.config_provider, &self.model_id)?;
+        client.complete(&self.request).await
+    }
+
+    /// Convenience method to set a text message and send in one call
+    pub async fn send_text(mut self, content: &str) -> crate::error::Result<CompletionResponse> {
         let message = MessageContent::Text {
             role: "user".to_string(),
             content: content.to_string(),
         };
         self.request.messages = vec![message];
-        
-        // Create client and send request
+
         let client = crate::client::HttpClient::from_model_id(&*self.config_provider, &self.model_id)?;
         client.complete(&self.request).await
     }
@@ -387,17 +1015,31 @@ impl RequestBuilder {
         client.complete(&self.request).await
     }
     
-    /// Start a streaming request
-    pub async fn stream(mut self, content: &str) -> crate::error::Result<crate::streaming::Stream> {
-        // Create the message
+    /// Start a streaming request with the configured messages
+    /// Use `.prompt("text")` before calling this to set the message, or use `.stream_text("text")` as a shortcut
+    pub async fn stream(mut self) -> crate::error::Result<crate::streaming::Stream> {
+        if self.request.messages.is_empty() {
+            return Err(crate::error::Error::ValidationError(
+                "No messages set. Use .prompt(text) or .stream_text(text) instead.".to_string()
+            ));
+        }
+
+        self.request.stream = true;
+
+        // Create client and send streaming request
+        let client = crate::client::HttpClient::from_model_id(&*self.config_provider, &self.model_id)?;
+        client.complete_stream(&self.request).await
+    }
+
+    /// Convenience method to set a text message and stream in one call
+    pub async fn stream_text(mut self, content: &str) -> crate::error::Result<crate::streaming::Stream> {
         let message = MessageContent::Text {
             role: "user".to_string(),
             content: content.to_string(),
         };
         self.request.messages = vec![message];
         self.request.stream = true;
-        
-        // Create client and send streaming request
+
         let client = crate::client::HttpClient::from_model_id(&*self.config_provider, &self.model_id)?;
         client.complete_stream(&self.request).await
     }
