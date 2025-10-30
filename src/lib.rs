@@ -19,7 +19,7 @@ pub use client::{
 pub use error::{ClientError, Result};
 pub use types::{
     CompletionRequest, CompletionResponse, MessageContent, ContentBlock,
-    ImageFormat, AudioFormat, DocumentFormat, Usage, FromFile, RequestBuilder
+    ImageFormat, AudioFormat, DocumentFormat, Usage, FromFile, RequestBuilder, Message, MessageList
 };
 pub use private::Private;
 pub use runtime::ModelRegistry;

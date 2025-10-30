@@ -59,26 +59,38 @@ cllient compare gpt-4o-mini,claude-3-haiku "Explain quantum computing"
 ### Programmatic Usage
 
 ```rust
-use cllient::ModelRegistry;
+use cllient::{ModelRegistry, Message};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let registry = ModelRegistry::new()?;
-    
-    // Use specific model
+
+    // Simple single message
     let response = registry
         .from_id("gpt-4o-mini")?
         .prompt("Hello, world!")
-        .complete()
+        .send()
         .await?;
-    
-    // Use cheapest model matching pattern  
+
+    // Multi-turn conversation
+    let response = registry
+        .from_id("claude-3-haiku-20240307")?
+        .messages(vec![
+            Message::system("You are a helpful assistant"),
+            Message::user("What is 2+2?"),
+            Message::assistant("4"),
+            Message::user("And 4+4?"),
+        ])
+        .send()
+        .await?;
+
+    // Use cheapest model matching pattern
     let response = registry
         .use_cheapest("claude-*")?
         .prompt("Explain AI")
-        .complete()
+        .send()
         .await?;
-    
+
     println!("Response: {}", response.content);
     Ok(())
 }
