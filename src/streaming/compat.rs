@@ -49,9 +49,13 @@ impl StreamProcessor {
         &self,
         response: Response,
     ) -> Result<super::Stream> {
-        match self.config.format.as_str() {
-            "text/event-stream" => self.process_sse_response(response).await,
-            format => Err(ClientError::Stream(format!(
+        use crate::config::StreamingFormat;
+        match &self.config.format {
+            StreamingFormat::TextEventStream => self.process_sse_response(response).await,
+            StreamingFormat::Ndjson => Err(ClientError::Stream(
+                "NDJSON streaming not yet implemented".to_string()
+            )),
+            StreamingFormat::Custom(format) => Err(ClientError::Stream(format!(
                 "Unsupported streaming format: {}",
                 format
             ))),
@@ -108,11 +112,13 @@ impl StreamProcessor {
     }
 
     fn parse_sse_line(config: &StreamingConfig, line: &str) -> Option<StreamEvent> {
+        use crate::config::SseParser;
         // Handle different SSE parsing strategies based on the parser type
-        match config.parser.as_str() {
-            "anthropic_sse" => Self::parse_anthropic_sse(config, line),
-            "openai_sse" => Self::parse_openai_sse(config, line),
-            _ => Self::parse_generic_sse(config, line),
+        match &config.parser {
+            SseParser::AnthropicSse => Self::parse_anthropic_sse(config, line),
+            SseParser::OpenAiSse => Self::parse_openai_sse(config, line),
+            SseParser::GoogleSse => Self::parse_generic_sse(config, line), // TODO: implement Google SSE
+            SseParser::Custom(_) => Self::parse_generic_sse(config, line),
         }
     }
 
@@ -280,25 +286,59 @@ impl StreamProcessor {
     }
 }
 
-/// Helper trait for working with streaming responses
-pub trait StreamExt {
+/// Helper trait for working with streaming responses.
+///
+/// Provides convenience methods for collecting content, filtering, and parsing JSON.
+pub trait StreamEventExt {
     /// Collect only content events into a single string
     fn collect_content(self) -> impl std::future::Future<Output = Result<String>> + Send;
-    
-    /// Filter stream to only content events  
+
+    /// Filter stream to only content events
     fn content_only(self) -> Pin<Box<dyn Stream<Item = Result<String>> + Send>>;
+
+    /// Parse streaming content into typed `StreamItem<T>` values.
+    ///
+    /// This adapter extracts `Content` chunks from the stream, feeds them through
+    /// a `JsonStreamProcessor`, and yields `StreamItem<T>` for each detected structure.
+    ///
+    /// - `StreamItem::Data(T)` - Successfully parsed JSON matching type T
+    /// - `StreamItem::Text(TextContent)` - Non-JSON text or JSON that doesn't match T
+    /// - `StreamItem::Token(String)` - Individual tokens (if enabled)
+    ///
+    /// # Example
+    /// ```ignore
+    /// use serde::Deserialize;
+    /// use schemars::JsonSchema;
+    ///
+    /// #[derive(Deserialize, JsonSchema)]
+    /// struct ToolCall { name: String, args: serde_json::Value }
+    ///
+    /// let mut stream = client.complete_stream(&request).await?;
+    /// let mut typed_stream = stream.parse_json::<ToolCall>();
+    ///
+    /// while let Some(item) = typed_stream.next().await {
+    ///     match item {
+    ///         StreamItem::Data(tool) => println!("Tool call: {}", tool.name),
+    ///         StreamItem::Text(t) => print!("{}", t.text),
+    ///         _ => {}
+    ///     }
+    /// }
+    /// ```
+    fn parse_json<T>(self) -> Pin<Box<dyn Stream<Item = super::StreamItem<T>> + Send>>
+    where
+        T: serde::de::DeserializeOwned + schemars::JsonSchema + Send + 'static;
 }
 
-impl<S> StreamExt for S
+impl<S> StreamEventExt for S
 where
     S: Stream<Item = Result<StreamEvent>> + Send + 'static,
 {
     async fn collect_content(self) -> Result<String> {
         use futures::StreamExt as FuturesStreamExt;
-        
+
         let mut content = String::new();
         let mut stream = Box::pin(self);
-        
+
         while let Some(event_result) = FuturesStreamExt::next(&mut stream).await {
             match event_result? {
                 StreamEvent::Content(text) => content.push_str(&text),
@@ -306,13 +346,13 @@ where
                 _ => {} // Ignore other events
             }
         }
-        
+
         Ok(content)
     }
-    
+
     fn content_only(self) -> Pin<Box<dyn Stream<Item = Result<String>> + Send>> {
         use futures::StreamExt as FuturesStreamExt;
-        
+
         let stream = FuturesStreamExt::filter_map(self, |event_result| async move {
             match event_result {
                 Ok(StreamEvent::Content(text)) => Some(Ok(text)),
@@ -320,7 +360,48 @@ where
                 Err(e) => Some(Err(e)),
             }
         });
-        
+
         Box::pin(stream)
+    }
+
+    fn parse_json<T>(self) -> Pin<Box<dyn Stream<Item = super::StreamItem<T>> + Send>>
+    where
+        T: serde::de::DeserializeOwned + schemars::JsonSchema + Send + 'static,
+    {
+        use super::parsers::JsonStreamProcessor;
+
+        Box::pin(async_stream::stream! {
+            let mut processor = JsonStreamProcessor::<T>::new();
+            let mut stream = Box::pin(self);
+
+            while let Some(event_result) = futures::StreamExt::next(&mut stream).await {
+                match event_result {
+                    Ok(StreamEvent::Content(chunk)) => {
+                        // Feed content through the JSON processor
+                        for item in processor.process_chunk(&chunk) {
+                            yield item;
+                        }
+                    }
+                    Ok(StreamEvent::Error(e)) => {
+                        // Emit error as text so caller knows something went wrong
+                        yield super::StreamItem::Text(super::TextContent {
+                            text: format!("[Error: {}]", e),
+                        });
+                    }
+                    Ok(_) => {
+                        // Ignore Start, Finish, Usage, Role, Raw events
+                    }
+                    Err(_e) => {
+                        // Stream error - stop processing
+                        break;
+                    }
+                }
+            }
+
+            // Finalize and yield any remaining buffered content
+            for item in processor.finalize() {
+                yield item;
+            }
+        })
     }
 }

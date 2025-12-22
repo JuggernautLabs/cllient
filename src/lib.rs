@@ -9,8 +9,13 @@ pub mod types;
 pub mod private;
 pub mod runtime;
 pub mod chat;
+pub mod export;
 
-pub use config::{ServiceConfig, ModelConfig, ConfigLoader};
+pub use config::{
+    ServiceConfig, ModelConfig, ConfigLoader, VerificationStatus,
+    MessageFormat, SseParser, StreamingFormat, Currency,
+};
+pub use export::{RegistryExport, ServiceExport, ModelExport, RegistryStats};
 pub use embedded_config::EmbeddedConfigLoader;
 pub use client::{
     LowLevelClient, HttpClient, ClientFactory, ConfigProvider,
