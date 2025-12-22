@@ -13,7 +13,7 @@ http:
     {
       "model": "{{model_id}}",
       "messages": {{json messages}},
-      "system": "{{system}}",
+      {{#if system}}"system": {{json system}},{{/if}}
       "max_tokens": {{max_tokens}},
       "temperature": {{temperature}},
       "stream": {{stream}}

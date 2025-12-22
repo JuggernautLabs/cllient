@@ -228,7 +228,7 @@ pub mod sse;
 pub use sse::{OpenAISSEProvider, ClaudeSSEProvider, stream_from_sse_bytes};
 
 // Re-export compatibility layer
-pub use compat::{StreamEvent, StreamProcessor};
+pub use compat::{StreamEvent, StreamProcessor, StreamEventExt};
 
 // Type alias for streaming results
 pub type Stream = Pin<Box<dyn FuturesStream<Item = crate::error::Result<StreamEvent>> + Send>>;

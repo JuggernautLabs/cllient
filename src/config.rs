@@ -2,8 +2,149 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::fs;
+use std::fmt;
 use walkdir::WalkDir;
 use crate::error::{ClientError, ConfigError, Result};
+
+/// Message builder format - determines how messages are structured for the API
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum MessageFormat {
+    /// OpenAI-compatible message format (used by OpenAI, DeepSeek, Azure, most providers)
+    #[default]
+    OpenAI,
+    /// Anthropic Claude message format
+    Anthropic,
+    /// Google Gemini message format
+    Google,
+    /// Custom message builder (for extensibility)
+    Custom(String),
+}
+
+impl fmt::Display for MessageFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MessageFormat::OpenAI => write!(f, "openai"),
+            MessageFormat::Anthropic => write!(f, "anthropic"),
+            MessageFormat::Google => write!(f, "google"),
+            MessageFormat::Custom(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl Serialize for MessageFormat {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where S: serde::Serializer {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for MessageFormat {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where D: serde::Deserializer<'de> {
+        let s = String::deserialize(deserializer)?;
+        Ok(match s.to_lowercase().as_str() {
+            "openai" => MessageFormat::OpenAI,
+            "anthropic" => MessageFormat::Anthropic,
+            "google" => MessageFormat::Google,
+            _ => MessageFormat::Custom(s),
+        })
+    }
+}
+
+/// SSE parser type - determines how to parse streaming responses
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum SseParser {
+    /// OpenAI-compatible SSE format
+    #[default]
+    OpenAiSse,
+    /// Anthropic Claude SSE format
+    AnthropicSse,
+    /// Google Gemini SSE format
+    GoogleSse,
+    /// Custom SSE parser (for extensibility)
+    Custom(String),
+}
+
+impl fmt::Display for SseParser {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SseParser::OpenAiSse => write!(f, "openai_sse"),
+            SseParser::AnthropicSse => write!(f, "anthropic_sse"),
+            SseParser::GoogleSse => write!(f, "google_sse"),
+            SseParser::Custom(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl Serialize for SseParser {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where S: serde::Serializer {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for SseParser {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where D: serde::Deserializer<'de> {
+        let s = String::deserialize(deserializer)?;
+        Ok(match s.as_str() {
+            "openai_sse" => SseParser::OpenAiSse,
+            "anthropic_sse" => SseParser::AnthropicSse,
+            "google_sse" => SseParser::GoogleSse,
+            _ => SseParser::Custom(s),
+        })
+    }
+}
+
+/// Streaming format type
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum StreamingFormat {
+    /// Server-Sent Events (text/event-stream)
+    #[default]
+    TextEventStream,
+    /// Newline-delimited JSON
+    Ndjson,
+    /// Custom streaming format
+    Custom(String),
+}
+
+impl fmt::Display for StreamingFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StreamingFormat::TextEventStream => write!(f, "text/event-stream"),
+            StreamingFormat::Ndjson => write!(f, "application/x-ndjson"),
+            StreamingFormat::Custom(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl Serialize for StreamingFormat {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where S: serde::Serializer {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for StreamingFormat {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where D: serde::Deserializer<'de> {
+        let s = String::deserialize(deserializer)?;
+        Ok(match s.as_str() {
+            "text/event-stream" => StreamingFormat::TextEventStream,
+            "application/x-ndjson" => StreamingFormat::Ndjson,
+            _ => StreamingFormat::Custom(s),
+        })
+    }
+}
+
+/// Currency for pricing
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+pub enum Currency {
+    #[default]
+    USD,
+    EUR,
+    GBP,
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ServiceConfig {
@@ -11,9 +152,9 @@ pub struct ServiceConfig {
     pub http: HttpConfig,
     #[serde(default)]
     pub optional: HashMap<String, String>,
-    pub streaming: StreamingConfig,
+    pub streaming: StreamingConfigYaml,
     pub response: ResponseConfig,
-    pub message_builder: String,
+    pub message_builder: MessageFormat,
     #[serde(default)]
     pub rate_limits: RateLimits,
 }
@@ -29,22 +170,26 @@ pub struct HttpConfig {
     pub request: String, // The HTTP template
 }
 
+/// Streaming configuration from YAML files
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct StreamingConfig {
-    pub format: String,
-    pub parser: String,
+pub struct StreamingConfigYaml {
+    pub format: StreamingFormat,
+    pub parser: SseParser,
     #[serde(default)]
     pub line_prefix: Option<String>,
     #[serde(default)]
     pub done_marker: Option<String>,
     #[serde(default)]
-    pub events: Vec<StreamEvent>,
+    pub events: Vec<StreamEventConfig>,
     #[serde(default)]
     pub extract: HashMap<String, String>,
 }
 
+/// Backwards-compatible alias
+pub type StreamingConfig = StreamingConfigYaml;
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct StreamEvent {
+pub struct StreamEventConfig {
     #[serde(rename = "type")]
     pub event_type: String,
     pub extract: String,
@@ -107,6 +252,25 @@ pub struct ModelConfig {
     pub use_cases: Vec<String>,
 }
 
+/// Verification status for a model configuration
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum VerificationStatus {
+    /// Model has been manually tested and verified to work
+    Verified,
+    /// Model config was auto-generated and has not been tested
+    #[default]
+    Unverified,
+    /// Model was tested but found to have issues
+    Broken,
+    /// Model is deprecated and may stop working
+    Deprecated,
+    /// Model endpoint returned an error (e.g., 404, auth issues)
+    Error,
+    /// Model was not found at the provider
+    NotFound,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ModelInfo {
     pub id: String,
@@ -117,6 +281,12 @@ pub struct ModelInfo {
     #[serde(default)]
     pub variant: Option<String>,
     pub service: String,
+    /// Verification status - whether this model config has been tested
+    #[serde(default)]
+    pub status: VerificationStatus,
+    /// Optional lab/organization that created the model
+    #[serde(default)]
+    pub lab: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -139,7 +309,8 @@ pub struct Capabilities {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Pricing {
-    pub currency: String,
+    #[serde(default)]
+    pub currency: Currency,
     pub input_per_1k_tokens: f64,
     pub output_per_1k_tokens: f64,
     #[serde(default)]

@@ -1,11 +1,14 @@
 use std::sync::Arc;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use regex::Regex;
 use crate::client::ConfigProvider;
 use crate::embedded_config::EmbeddedConfigLoader;
-use crate::config::ModelConfig;
+use crate::config::{ModelConfig, ServiceConfig, VerificationStatus};
 use crate::error::{ClientError, Result};
 use crate::types::RequestBuilder;
+use crate::export::{
+    RegistryExport, ServiceExport, ModelExport, RegistryStats, RateLimitsExport,
+};
 
 /// Main runtime object that contains all model configurations and provides
 /// a fluent API for model selection and request building
@@ -103,7 +106,162 @@ impl ModelRegistry {
             })
             .collect()
     }
-    
+
+    // === Service Access Methods (delegated from ConfigProvider) ===
+
+    /// List all available services
+    pub fn list_services(&self) -> Vec<&str> {
+        self.config_provider.list_services()
+    }
+
+    /// Get service configuration by name
+    pub fn get_service(&self, name: &str) -> Result<&ServiceConfig> {
+        self.config_provider.get_service(name)
+    }
+
+    /// Get both model and service configuration in one call
+    pub fn get_model_with_service(&self, model_id: &str) -> Result<(&ModelConfig, &ServiceConfig)> {
+        self.config_provider.get_model_with_service(model_id)
+    }
+
+    // === Verification Status Methods ===
+
+    /// List only verified models
+    pub fn list_verified_models(&self) -> Vec<&str> {
+        self.config_provider.list_models()
+            .into_iter()
+            .filter(|model_id| {
+                if let Ok(cfg) = self.config_provider.get_model(model_id) {
+                    cfg.model.status == VerificationStatus::Verified
+                } else {
+                    false
+                }
+            })
+            .collect()
+    }
+
+    /// List models by verification status
+    pub fn list_models_by_status(&self, status: VerificationStatus) -> Vec<&str> {
+        self.config_provider.list_models()
+            .into_iter()
+            .filter(|model_id| {
+                if let Ok(cfg) = self.config_provider.get_model(model_id) {
+                    cfg.model.status == status
+                } else {
+                    false
+                }
+            })
+            .collect()
+    }
+
+    /// Check if a model is verified
+    pub fn is_verified(&self, model_id: &str) -> bool {
+        self.config_provider.get_model(model_id)
+            .map(|cfg| cfg.model.status == VerificationStatus::Verified)
+            .unwrap_or(false)
+    }
+
+    // === Registry Export ===
+
+    /// Export the full registry as a serializable structure.
+    ///
+    /// This is useful for RPC boundaries where you need to expose
+    /// the complete registry state in a single call.
+    pub fn export(&self) -> RegistryExport {
+        // Count models per service
+        let mut service_model_counts: HashMap<String, usize> = HashMap::new();
+        let mut verified_count = 0;
+        let mut unverified_count = 0;
+
+        // Build model exports
+        let models: Vec<ModelExport> = self.config_provider.list_models()
+            .into_iter()
+            .filter_map(|model_id| {
+                let cfg = self.config_provider.get_model(model_id).ok()?;
+
+                // Track service usage
+                *service_model_counts.entry(cfg.model.service.clone()).or_insert(0) += 1;
+
+                // Track verification stats
+                if cfg.model.status == VerificationStatus::Verified {
+                    verified_count += 1;
+                } else {
+                    unverified_count += 1;
+                }
+
+                Some(ModelExport {
+                    id: cfg.model.id.clone(),
+                    family: cfg.model.family.clone(),
+                    name: cfg.model.name.clone(),
+                    service: cfg.model.service.clone(),
+                    version: cfg.model.version.clone(),
+                    variant: cfg.model.variant.clone(),
+                    lab: cfg.model.lab.clone(),
+                    status: cfg.model.status.clone(),
+                    capabilities: cfg.capabilities.clone(),
+                    pricing: cfg.pricing.clone(),
+                    constraints: cfg.constraints.clone(),
+                    use_cases: cfg.use_cases.clone(),
+                })
+            })
+            .collect();
+
+        // Build service exports
+        let services: Vec<ServiceExport> = self.config_provider.list_services()
+            .into_iter()
+            .filter_map(|service_name| {
+                let cfg = self.config_provider.get_service(service_name).ok()?;
+
+                let rate_limits = if cfg.rate_limits.requests_per_minute.is_some()
+                    || cfg.rate_limits.tokens_per_minute.is_some()
+                    || cfg.rate_limits.concurrent_requests.is_some()
+                {
+                    Some(RateLimitsExport::from(&cfg.rate_limits))
+                } else {
+                    None
+                };
+
+                Some(ServiceExport {
+                    name: service_name.to_string(),
+                    base_url: cfg.service.base_url.clone(),
+                    message_format: cfg.message_builder.clone(),
+                    rate_limits,
+                    model_count: *service_model_counts.get(service_name).unwrap_or(&0),
+                })
+            })
+            .collect();
+
+        let families = self.list_families();
+
+        RegistryExport {
+            stats: RegistryStats {
+                service_count: services.len(),
+                family_count: families.len(),
+                model_count: models.len(),
+                verified_count,
+                unverified_count,
+            },
+            services,
+            families,
+            models,
+        }
+    }
+
+    /// Export only verified models and their services
+    pub fn export_verified(&self) -> RegistryExport {
+        self.export().verified_only()
+    }
+
+    /// Export models for a specific service
+    pub fn export_by_service(&self, service: &str) -> RegistryExport {
+        self.export().filter_by_service(service)
+    }
+
+    /// Export models for a specific family
+    pub fn export_by_family(&self, family: &str) -> RegistryExport {
+        self.export().filter_by_family(family)
+    }
+
     // Private helper methods
     
     fn find_cheapest_model(&self, pattern: &str) -> Result<String> {

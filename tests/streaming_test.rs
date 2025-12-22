@@ -85,15 +85,16 @@ fn test_nested_json_extraction() {
 
 #[tokio::test]
 async fn test_stream_processor_creation() {
+    use cllient::{StreamingFormat, SseParser};
     let config = StreamingConfig {
-        format: "text/event-stream".to_string(),
-        parser: "openai_sse".to_string(),
+        format: StreamingFormat::TextEventStream,
+        parser: SseParser::OpenAiSse,
         line_prefix: Some("data: ".to_string()),
         done_marker: Some("[DONE]".to_string()),
         events: vec![],
         extract: Default::default(),
     };
-    
+
     let processor = StreamProcessor::new(&config).unwrap();
     // Just ensure it creates without error
     drop(processor);

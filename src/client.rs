@@ -116,7 +116,7 @@ impl HttpClient {
 
         // Build messages using the appropriate builder
         let messages = MessageBuilder::build_messages(
-            &self.service_config.message_builder,
+            &self.service_config.message_builder.to_string(),
             &request.messages,
         )?;
         variables.insert("messages".to_string(), messages);
