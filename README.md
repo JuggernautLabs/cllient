@@ -1,27 +1,62 @@
-# cllient - Experimental Config-Driven LLM Client
+# cllient
 
-> **⚠️ Experimental Status**: This project is a proof-of-concept built with AI assistance and minimal human oversight. Only **3 providers** have been actually tested (OpenAI, Anthropic, DeepSeek). The other 242 model configs route through OpenRouter and were auto-generated from their API. Use at your own risk.
+A config-driven LLM client in Rust. Define providers and models in YAML instead of code.
 
-An experimental Rust LLM client that uses YAML configuration files instead of hardcoded provider logic. The core idea: separate "services" (API endpoints) from "models" (what you call) so you can add new providers without touching code.
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  YAML Configs                                                    │
+│  ┌─────────────────┐    ┌─────────────────┐                      │
+│  │ service/        │    │ family/         │                      │
+│  │  openai.yaml    │◄───│  gpt/4o.yaml    │  model references    │
+│  │  anthropic.yaml │◄───│  claude/*.yaml  │  service by name     │
+│  │  deepseek.yaml  │◄───│  deepseek/*.yaml│                      │
+│  └─────────────────┘    └─────────────────┘                      │
+│          │                      │                                │
+│          ▼                      ▼                                │
+│  ┌─────────────────────────────────────────┐                     │
+│  │           ModelRegistry                 │                     │
+│  │   - Loads configs (embedded or files)   │                     │
+│  │   - Renders Handlebars templates        │                     │
+│  │   - Substitutes env vars (API keys)     │                     │
+│  └─────────────────────────────────────────┘                     │
+│                        │                                         │
+│                        ▼                                         │
+│  ┌─────────────────────────────────────────┐                     │
+│  │           HTTP + SSE Streaming          │                     │
+│  │   Provider-specific parsers (OpenAI,    │                     │
+│  │   Anthropic, Google) extract content    │                     │
+│  └─────────────────────────────────────────┘                     │
+│                        │                                         │
+│                        ▼                                         │
+│  ┌─────────────────────────────────────────┐                     │
+│  │        Streaming JSON Output            │                     │
+│  │   Valid JSON emitted incrementally -    │                     │
+│  │   watch the response build in real-time │                     │
+│  └─────────────────────────────────────────┘                     │
+└──────────────────────────────────────────────────────────────────┘
+```
 
-## ✨ What Works
+> **Experimental**: Proof-of-concept with 3 tested providers (OpenAI, Anthropic, DeepSeek). 242 additional models available via OpenRouter but not validated. Not production-ready.
 
-- 🧪 **3 Tested Providers** - OpenAI, Anthropic, and DeepSeek work reliably
-- 📡 **SSE Streaming** - Token-level streaming with Server-Sent Events
-- 🔧 **Config-Driven** - Add providers via YAML without code changes (in theory)
-- 📦 **339 Model Configs** - Mostly OpenRouter routes (242), some direct integrations (97)
-- 🎯 **Multiple APIs** - CLI tool, Rust library, basic runtime API
-- 💰 **Pricing Data** - Auto-scraped from OpenRouter API (accuracy not guaranteed)
+## Features
 
-## 🚧 What's Experimental
+- **Config-driven** - Add providers via YAML, no code changes
+- **SSE streaming** - Real-time token streaming with provider-specific parsers
+- **Streaming JSON output** - Emit valid JSON incrementally as tokens arrive (pipe-friendly)
+- **339 model configs** - 97 direct integrations + 242 via OpenRouter
+- **Model verification tracking** - Know which models are tested vs auto-generated
+- **Registry export** - Single-call access to full registry for RPC/integrations
+- **CLI + library** - Use from command line or as a Rust crate
+- **Embedded configs** - Ship as a single binary with all configs baked in
 
-- **OpenRouter dependency**: 71% of model configs just proxy through OpenRouter
-- **Untested configs**: Most of the 242 OpenRouter models haven't been validated
-- **No error handling**: Fails ungracefully when things go wrong
-- **Template fragility**: YAML HTTP templates can break easily
-- **Zero production use**: This is a research project, not production-ready
+## Limitations
 
-## 🚀 Quick Start
+- Most configs are untested (especially OpenRouter models)
+- Minimal error handling
+- YAML templates can be fragile
+- Research project, not production software
+
+## Quick Start
 
 ### Installation
 
@@ -37,23 +72,52 @@ cp .env.example .env
 ### Basic Usage
 
 ```bash
-# List available models
+# List available models (alias: ls)
 cllient list
 
-# Simple completion
+# Simple completion (JSON output by default)
 cllient ask gpt-4o-mini "What is Rust programming?"
 
-# Real-time streaming (JSON output - see response build in real-time)
-cllient stream deepseek-chat "Tell me a story about robots"
+# Streaming - outputs valid JSON incrementally as tokens arrive
+cllient stream deepseek-chat "Tell me a story"
 
-# Human-readable streaming with emojis
-cllient --pretty stream deepseek-chat "Tell me a story about robots"
+# Human-readable output with decorations
+cllient --pretty stream deepseek-chat "Tell me a story"
+
+# Clean output for piping (just the response, no JSON)
+cllient --clean ask gpt-4o-mini "Hello" | wc -w
 
 # Interactive chat
 cllient chat claude-3-haiku-20240307
 
 # Compare models
 cllient compare gpt-4o-mini,claude-3-haiku "Explain quantum computing"
+
+# Get help on any command
+cllient --help
+cllient ask --help
+```
+
+### CLI Reference
+
+```
+cllient [OPTIONS] <COMMAND>
+
+Commands:
+  list (ls)       List available models
+  list-services   List available services/providers
+  ask             Single completion request
+  stream          Streaming completion request
+  chat            Interactive chat session
+  compare         Compare multiple models on same prompt
+  debug-response  Debug API response issues
+
+Options:
+  -v, --verbose   Enable debug logging
+      --pretty    Human-readable output with decorations
+      --clean     Raw response only (for piping)
+  -h, --help      Print help (works on all subcommands)
+  -V, --version   Print version
 ```
 
 ### Programmatic Usage
@@ -96,7 +160,91 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## 📚 Documentation
+### Streaming
+
+The library provides real-time streaming via `StreamEvent`. Each event represents a piece of the response as it arrives:
+
+```rust
+use cllient::{ClientFactory, EmbeddedConfigLoader, EmbeddedClientFactory, CompletionRequest};
+use cllient::streaming::StreamEvent;
+use futures::StreamExt;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let loader = EmbeddedConfigLoader::new()?;
+    let factory = EmbeddedClientFactory::new(loader);
+    let client = factory.create_client("gpt-4o-mini")?;
+
+    let request = CompletionRequest::text("user", "Tell me a story")
+        .with_streaming(true);
+
+    let mut stream = client.complete_stream(&request).await?;
+
+    while let Some(event) = stream.next().await {
+        match event? {
+            StreamEvent::Content(text) => print!("{}", text),  // Token chunk
+            StreamEvent::Start => println!("--- stream started ---"),
+            StreamEvent::Finish(reason) => println!("\n--- done: {:?} ---", reason),
+            StreamEvent::Usage { input_tokens, output_tokens, .. } => {
+                println!("Tokens: in={:?}, out={:?}", input_tokens, output_tokens);
+            }
+            StreamEvent::Error(e) => eprintln!("Error: {}", e),
+            _ => {}
+        }
+    }
+    Ok(())
+}
+```
+
+**`StreamEvent` variants:**
+
+| Variant | Description |
+|---------|-------------|
+| `Content(String)` | A chunk of text content (the main output) |
+| `Start` | Stream has started |
+| `Finish(Option<String>)` | Stream complete, with optional finish reason |
+| `Usage { input_tokens, output_tokens, total_tokens }` | Token usage stats |
+| `Role(String)` | Role information (usually at start) |
+| `Error(String)` | An error occurred |
+| `Raw(String)` | Raw event data (for debugging) |
+
+### Typed JSON Extraction
+
+Use `StreamEventExt::parse_json<T>()` to extract typed data from streaming responses. This is useful when the LLM returns structured JSON (tool calls, structured output, etc.):
+
+```rust
+use cllient::streaming::{StreamEventExt, StreamItem};
+use serde::Deserialize;
+use schemars::JsonSchema;
+use futures::StreamExt;
+
+#[derive(Deserialize, JsonSchema)]
+struct ToolCall {
+    name: String,
+    args: serde_json::Value,
+}
+
+let stream = client.complete_stream(&request).await?;
+let mut typed_stream = stream.parse_json::<ToolCall>();
+
+while let Some(item) = typed_stream.next().await {
+    match item {
+        StreamItem::Data(tool) => println!("Tool call: {}", tool.name),
+        StreamItem::Text(t) => print!("{}", t.text),  // Non-JSON text
+        StreamItem::Token(tok) => print!("{}", tok),  // Raw tokens
+    }
+}
+```
+
+**`StreamItem<T>` variants:**
+
+| Variant | Description |
+|---------|-------------|
+| `Data(T)` | Successfully parsed JSON matching your type |
+| `Text(TextContent)` | Plain text or JSON that doesn't match type T |
+| `Token(String)` | Individual token for real-time display |
+
+## Documentation
 
 ### Getting Started
 - **[1. Installation & Setup](docs/1_installation.md)** - Prerequisites, installation, environment setup
@@ -111,20 +259,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Advanced Usage
 - **[Examples](docs/examples/)** - Real-world usage patterns and scripts
 - **[6. Development](docs/6_development.md)** - Contributing, testing, workflow automation
+- **[Registry Export API](docs/architecture/16680999631625794559_registry-export.md)** - RPC-friendly registry access and model verification
 - **[Complete Documentation Hub](docs/)** - All guides and references
 
-## 🏗️ The Interesting Part: Architecture
+## Architecture
 
 The core idea is **"unassociated truth"** - services and models are separate entities that can be mixed:
 
 ```
-Traditional client libraries:
-  gpt-4 → hardcoded to talk to OpenAI API ❌
-
-cllient approach:
-  gpt-4 → can use {OpenAI, Azure, OpenRouter} ✅
-  Model configs reference service configs
-  Service configs are HTTP templates
+Traditional:  gpt-4 → hardcoded to OpenAI API
+cllient:      gpt-4 → { OpenAI, Azure, OpenRouter }
+              Model configs reference service configs
+              Service configs are HTTP templates
 ```
 
 **How it works:**
@@ -161,7 +307,7 @@ cllient approach:
 - **[HTTP Client](src/client.rs)** - Renders templates, handles streaming
 - **[Template Engine](src/template.rs)** - Handlebars + environment variables
 
-## 🔧 Configuration
+## Configuration
 
 ### What's Actually Available
 
@@ -219,7 +365,7 @@ http:
 
 **Complete Configuration Guide**: [4. Configuration Documentation](docs/4_configuration.md)
 
-## 🛠️ Development
+## Development
 
 ### Build & Test
 
@@ -249,10 +395,11 @@ make cost-analysis
 
 **Complete Development Guide**: [6. Development Documentation](docs/6_development.md)
 
-## 📈 What's Done vs. What's Next
+## Status
 
-**Actually Completed:**
+**Completed:**
 - [x] Core Rust implementation with SSE streaming
+- [x] Streaming JSON output (valid JSON emitted incrementally)
 - [x] Config-driven architecture (YAML templates)
 - [x] Basic CLI tool (ask, stream, chat, compare)
 - [x] 3 tested providers (OpenAI, Anthropic, DeepSeek)
@@ -268,7 +415,7 @@ make cost-analysis
 - [ ] Production hardening
 - [ ] Local model support (llama.cpp, etc.)
 
-## 🤝 Contributing
+## Contributing
 
 This is an experimental project, so contributions are welcome but come with caveats:
 
@@ -292,7 +439,7 @@ This is an experimental project, so contributions are welcome but come with cave
 
 **See**: [6. Development Guide](docs/6_development.md) for detailed workflows.
 
-## 🤔 Should I Use This?
+## Should I Use This?
 
 **Use this if:**
 - You want to experiment with the config-driven architecture idea
@@ -313,11 +460,11 @@ This is an experimental project, so contributions are welcome but come with cave
 - LangChain / LlamaIndex: More mature, battle-tested frameworks
 - LiteLLM: Similar unified interface concept, but production-ready
 
-## 📄 License
+## License
 
 This project is licensed under the terms specified in the [LICENSE](LICENSE) file.
 
-## 🔗 Source Code Structure
+## Source Code
 
 - **[`src/bin/cllient.rs`](src/bin/cllient.rs)** - CLI implementation
 - **[`src/runtime.rs`](src/runtime.rs)** - High-level Runtime API  
@@ -328,7 +475,7 @@ This project is licensed under the terms specified in the [LICENSE](LICENSE) fil
 
 ---
 
-**Quick Links**: [📖 Documentation](docs/) | [🚀 Examples](docs/examples/) | [⚙️ Configuration](docs/4_configuration.md) | [🏗️ Architecture](docs/5_architecture.md)
+**Quick Links**: [Documentation](docs/) | [Examples](docs/examples/) | [Configuration](docs/4_configuration.md) | [Architecture](docs/5_architecture.md)
 
 ---
 
