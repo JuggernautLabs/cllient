@@ -129,8 +129,8 @@ fn test_cli_invalid_model() {
     
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(
-        stderr.contains("not found") || stderr.contains("Unknown model"),
-        "Expected error message about unknown model"
+        stderr.contains("not found") || stderr.contains("Unknown model") || stderr.contains("ModelNotFound"),
+        "Expected error message about unknown model, got: {}", stderr
     );
 }
 
