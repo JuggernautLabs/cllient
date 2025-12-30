@@ -4,6 +4,7 @@ model:
   lab: openai
   family: gpt
   service: openai-completions
+  status: verified
 
 capabilities:
   context_window: 4095
@@ -24,3 +25,6 @@ defaults:
   temperature: 1.0
   max_tokens: 4096
   top_p: 1.0
+verification:
+  poem: "Year of birth approx. 1963 approx. 1964  It is possible that Sushila is older, perhaps born in late  late 1962  Subrata is approx born Dec. 1963 in Kolkata, India"
+  verified_at: "2025-12-30"

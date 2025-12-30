@@ -5,7 +5,7 @@ model:
   family: gpt
   service: openai
 
-  status: error
+  status: verified
 capabilities:
   context_window: 128000
   max_output_tokens: 16384
@@ -20,3 +20,6 @@ pricing:
   currency: USD
   input_per_1k_tokens: 0.005
   output_per_1k_tokens: 0.015000000000000001
+verification:
+  poem: "Stars whisper secrets in night’s hush, dreams begin to rise."
+  verified_at: "2025-12-30"

@@ -164,6 +164,12 @@ pub struct ServiceConfig {
 pub struct ServiceInfo {
     pub name: String,
     pub base_url: String,
+    /// Verification status for this service
+    #[serde(default)]
+    pub status: VerificationStatus,
+    /// Optional description of the service
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -254,7 +260,7 @@ pub struct ModelConfig {
 }
 
 /// Verification status for a model configuration
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Hash, Default, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum VerificationStatus {
     /// Model has been manually tested and verified to work

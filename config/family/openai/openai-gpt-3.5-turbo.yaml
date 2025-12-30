@@ -4,6 +4,7 @@ model:
   lab: openai
   family: gpt
   service: openai
+  status: verified
 
 capabilities:
   context_window: 16385
@@ -19,3 +20,6 @@ pricing:
   currency: USD
   input_per_1k_tokens: 0.0005
   output_per_1k_tokens: 0.0015
+verification:
+  poem: "Whispers of wind carry secrets of the forgotten past, softly."
+  verified_at: "2025-12-30"
