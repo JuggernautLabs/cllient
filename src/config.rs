@@ -1,3 +1,4 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -7,7 +8,7 @@ use walkdir::WalkDir;
 use crate::error::{ClientError, ConfigError, Result};
 
 /// Message builder format - determines how messages are structured for the API
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, JsonSchema)]
 pub enum MessageFormat {
     /// OpenAI-compatible message format (used by OpenAI, DeepSeek, Azure, most providers)
     #[default]
@@ -138,7 +139,7 @@ impl<'de> Deserialize<'de> for StreamingFormat {
 }
 
 /// Currency for pricing
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default, JsonSchema)]
 pub enum Currency {
     #[default]
     USD,
@@ -253,7 +254,7 @@ pub struct ModelConfig {
 }
 
 /// Verification status for a model configuration
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum VerificationStatus {
     /// Model has been manually tested and verified to work
@@ -289,7 +290,7 @@ pub struct ModelInfo {
     pub lab: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Capabilities {
     pub context_window: u32,
     pub max_output_tokens: u32,
@@ -307,7 +308,7 @@ pub struct Capabilities {
     pub multimodal: bool,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Pricing {
     #[serde(default)]
     pub currency: Currency,
@@ -317,7 +318,7 @@ pub struct Pricing {
     pub cached_input_per_1k_tokens: Option<f64>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, JsonSchema)]
 pub struct Constraints {
     #[serde(default)]
     pub max_images_per_message: Option<u32>,

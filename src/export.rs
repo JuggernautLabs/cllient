@@ -3,6 +3,7 @@
 //! This module provides serializable types for exposing the full registry
 //! state through RPC interfaces without requiring N+1 calls.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use crate::config::{
     Capabilities, Pricing, Constraints, RateLimits, VerificationStatus,
@@ -10,7 +11,7 @@ use crate::config::{
 };
 
 /// Complete registry export - all services, families, and models in one structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct RegistryExport {
     /// All available services
     pub services: Vec<ServiceExport>,
@@ -23,7 +24,7 @@ pub struct RegistryExport {
 }
 
 /// Summary statistics about the registry
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct RegistryStats {
     /// Total number of services
     pub service_count: usize,
@@ -38,7 +39,7 @@ pub struct RegistryStats {
 }
 
 /// Serializable service information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ServiceExport {
     /// Service identifier (e.g., "openai", "anthropic")
     pub name: String,
@@ -53,7 +54,7 @@ pub struct ServiceExport {
 }
 
 /// Serializable rate limits
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct RateLimitsExport {
     pub requests_per_minute: Option<u32>,
     pub tokens_per_minute: Option<u32>,
@@ -71,7 +72,7 @@ impl From<&RateLimits> for RateLimitsExport {
 }
 
 /// Serializable model information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ModelExport {
     /// Model identifier
     pub id: String,
