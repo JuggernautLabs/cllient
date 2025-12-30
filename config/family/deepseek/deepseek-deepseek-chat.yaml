@@ -4,6 +4,7 @@ model:
   lab: deepseek
   family: deepseek
   service: deepseek
+  status: verified
 
 capabilities:
   context_window: 163840
@@ -19,3 +20,6 @@ pricing:
   currency: USD
   input_per_1k_tokens: 0.0003
   output_per_1k_tokens: 0.0008500000000000001
+verification:
+  poem: "Dawn’s blush on silent wings, a whispered hush."
+  verified_at: "2025-12-30"

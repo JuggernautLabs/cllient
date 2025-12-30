@@ -52,19 +52,22 @@ pub enum ClientError {
 pub enum ConfigError {
     #[error("Service not found: {0}")]
     ServiceNotFound(String),
-    
+
     #[error("Model not found: {0}")]
     ModelNotFound(String),
-    
+
     #[error("Invalid configuration path: {0}")]
     InvalidPath(String),
-    
+
     #[error("Missing required field: {0}")]
     MissingField(String),
-    
+
     #[error("Invalid YAML: {0}")]
     InvalidYaml(String),
-    
+
     #[error("Environment variable not found: {0}")]
     EnvVarNotFound(String),
+
+    #[error("Broken references in config: {}", .0.join("; "))]
+    BrokenReferences(Vec<String>),
 }

@@ -10,6 +10,9 @@ pub mod private;
 pub mod runtime;
 pub mod chat;
 pub mod export;
+pub mod registry_index;
+pub mod validation;
+pub mod query;
 
 pub use config::{
     ServiceConfig, ModelConfig, ConfigLoader, VerificationStatus,
@@ -17,6 +20,9 @@ pub use config::{
 };
 pub use export::{RegistryExport, ServiceExport, ModelExport, RegistryStats};
 pub use embedded_config::EmbeddedConfigLoader;
+pub use registry_index::{RegistryIndex, IndexStats, BrokenReference};
+pub use validation::{ValidationLevel, ValidationReport, ValidationIssue, Severity, ConfigValidator};
+pub use query::{ModelQuery, Filter, CapabilityFilter, OrderBy};
 pub use client::{
     LowLevelClient, HttpClient, ClientFactory, ConfigProvider,
     FileBasedClientFactory, EmbeddedClientFactory

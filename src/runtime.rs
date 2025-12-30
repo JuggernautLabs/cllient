@@ -9,26 +9,72 @@ use crate::types::RequestBuilder;
 use crate::export::{
     RegistryExport, ServiceExport, ModelExport, RegistryStats, RateLimitsExport,
 };
+use crate::registry_index::{RegistryIndex, IndexStats, BrokenReference};
+use crate::query::ModelQuery;
+use crate::validation::{ConfigValidator, ValidationLevel, ValidationReport};
 
 /// Main runtime object that contains all model configurations and provides
 /// a fluent API for model selection and request building
 pub struct ModelRegistry {
     config_provider: Arc<dyn ConfigProvider + Send + Sync>,
+    index: RegistryIndex,
 }
 
 impl ModelRegistry {
-    /// Create a new runtime with embedded configurations
+    /// Create a new runtime with embedded configurations.
+    ///
+    /// This builds the bidirectional index at initialization time.
+    /// If there are broken references (models referencing non-existent services),
+    /// an error is returned.
     pub fn new() -> Result<Self> {
         let embedded_loader = EmbeddedConfigLoader::new()?;
+        let index = RegistryIndex::build(&embedded_loader);
+
+        // Validate cross-references at startup
+        index.validate_refs()?;
+
         Ok(Self {
             config_provider: Arc::new(embedded_loader),
+            index,
         })
     }
-    
-    /// Create a runtime with a custom config provider
-    pub fn with_provider<T: ConfigProvider + Send + Sync + 'static>(provider: T) -> Self {
+
+    /// Create a new runtime without strict validation.
+    ///
+    /// Unlike `new()`, this allows broken references and orphan services.
+    /// Use this for debugging or when you need to inspect broken configs.
+    pub fn new_permissive() -> Result<Self> {
+        let embedded_loader = EmbeddedConfigLoader::new()?;
+        let index = RegistryIndex::build(&embedded_loader);
+
+        Ok(Self {
+            config_provider: Arc::new(embedded_loader),
+            index,
+        })
+    }
+
+    /// Create a runtime with a custom config provider.
+    ///
+    /// This builds the bidirectional index from the provider.
+    /// If there are broken references, an error is returned.
+    pub fn with_provider<T: ConfigProvider + Send + Sync + 'static>(provider: T) -> Result<Self> {
+        let index = RegistryIndex::build(&provider);
+
+        // Validate cross-references
+        index.validate_refs()?;
+
+        Ok(Self {
+            config_provider: Arc::new(provider),
+            index,
+        })
+    }
+
+    /// Create a runtime with a custom config provider without strict validation.
+    pub fn with_provider_permissive<T: ConfigProvider + Send + Sync + 'static>(provider: T) -> Self {
+        let index = RegistryIndex::build(&provider);
         Self {
             config_provider: Arc::new(provider),
+            index,
         }
     }
     
@@ -260,6 +306,106 @@ impl ModelRegistry {
     /// Export models for a specific family
     pub fn export_by_family(&self, family: &str) -> RegistryExport {
         self.export().filter_by_family(family)
+    }
+
+    // === Query API ===
+
+    /// Create a fluent query builder for filtering models.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let models = registry.query()
+    ///     .service("openai")
+    ///     .verified()
+    ///     .with_vision()
+    ///     .fuzzy("gpt turbo")
+    ///     .list();
+    /// ```
+    pub fn query(&self) -> ModelQuery<'_, dyn ConfigProvider + Send + Sync> {
+        ModelQuery::new(self.config_provider.as_ref(), &self.index)
+    }
+
+    // === Index Access ===
+
+    /// Get the bidirectional registry index.
+    pub fn index(&self) -> &RegistryIndex {
+        &self.index
+    }
+
+    /// Get index statistics.
+    pub fn index_stats(&self) -> IndexStats {
+        self.index.stats()
+    }
+
+    /// Get all models for a specific service (fast indexed lookup).
+    pub fn models_for_service(&self, service: &str) -> &[String] {
+        self.index.models_for_service(service)
+    }
+
+    /// Get the service for a specific model (fast indexed lookup).
+    pub fn service_for_model(&self, model_id: &str) -> Option<&str> {
+        self.index.service_for_model(model_id)
+    }
+
+    /// Get all broken references (models referencing non-existent services).
+    pub fn broken_refs(&self) -> &[BrokenReference] {
+        self.index.broken_refs()
+    }
+
+    /// Get all orphan services (services with no models).
+    pub fn orphan_services(&self) -> &[String] {
+        self.index.orphan_services()
+    }
+
+    /// Check if the registry has any broken references.
+    pub fn has_broken_refs(&self) -> bool {
+        self.index.has_broken_refs()
+    }
+
+    // === Validation API ===
+
+    /// Run validation at the specified levels.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let report = registry.validate(&[
+    ///     ValidationLevel::Schema,
+    ///     ValidationLevel::CrossRef,
+    ///     ValidationLevel::Semantic,
+    /// ]);
+    /// if !report.passed {
+    ///     for error in report.errors() {
+    ///         eprintln!("{}", error);
+    ///     }
+    /// }
+    /// ```
+    pub fn validate(&self, levels: &[ValidationLevel]) -> ValidationReport {
+        let validator = ConfigValidator::new(self.config_provider.as_ref(), &self.index);
+        validator.validate(levels)
+    }
+
+    /// Validate a single model.
+    pub fn validate_model(&self, model_id: &str, levels: &[ValidationLevel]) -> ValidationReport {
+        let validator = ConfigValidator::new(self.config_provider.as_ref(), &self.index);
+        validator.validate_model(model_id, levels)
+    }
+
+    /// Validate a single service.
+    pub fn validate_service(&self, service_name: &str, levels: &[ValidationLevel]) -> ValidationReport {
+        let validator = ConfigValidator::new(self.config_provider.as_ref(), &self.index);
+        validator.validate_service(service_name, levels)
+    }
+
+    /// Quick check if the registry is valid (no errors at any level).
+    pub fn is_valid(&self) -> bool {
+        let report = self.validate(&[
+            ValidationLevel::Schema,
+            ValidationLevel::CrossRef,
+            ValidationLevel::Semantic,
+        ]);
+        report.passed
     }
 
     // Private helper methods
