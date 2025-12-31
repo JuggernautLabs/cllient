@@ -29,6 +29,11 @@ path = "src/bin/cllient-utils.rs"
 name = "cllient-registry"
 path = "src/bin/cllient-registry.rs"
 
+[[bin]]
+name = "cllient-hub"
+path = "src/bin/cllient-hub.rs"
+required-features = ["hub"]
+
 [dependencies]
 # YAML configuration and JSON
 serde = { version = "1.0", features = ["derive"] }
@@ -85,8 +90,16 @@ chrono = "0.4"
 # Embed config files into binary
 rust-embed = "8.0"
 
+# Plugin/Hub support (optional)
+hub-core = { path = "../hypermemetic/hub-core", optional = true }
+hub-macro = { path = "../hypermemetic/hub-macro", optional = true }
+jsonrpsee = { version = "0.26", features = ["server"], optional = true }
+uuid = { version = "1.6", features = ["v4", "v5"], optional = true }
+
 [features]
 default = []
+plugin = ["dep:hub-core", "dep:hub-macro", "dep:uuid", "dep:jsonrpsee"]
+hub = ["plugin"]
 
 [dev-dependencies]
 tokio-test = "0.4"
