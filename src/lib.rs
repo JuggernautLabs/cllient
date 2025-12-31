@@ -14,6 +14,11 @@ pub mod registry_index;
 pub mod validation;
 pub mod query;
 
+#[cfg(feature = "plugin")]
+pub mod events;
+#[cfg(feature = "plugin")]
+pub mod plugin;
+
 pub use config::{
     ServiceConfig, ModelConfig, ConfigLoader, VerificationStatus,
     MessageFormat, SseParser, StreamingFormat, Currency,
@@ -35,6 +40,15 @@ pub use types::{
 pub use private::Private;
 pub use runtime::ModelRegistry;
 pub use chat::{ChatterId, ChatBuilder};
+
+// Plugin exports (feature-gated)
+#[cfg(feature = "plugin")]
+pub use events::{
+    CompletionEvent, ModelEvent, ModelInfo, ServiceEvent, ServiceInfo,
+    VerifyEvent, QueryEvent, CapabilitySummary, PricingSummary,
+};
+#[cfg(feature = "plugin")]
+pub use plugin::CllientActivation;
 
 // Re-export common types
 pub use reqwest::Response;
