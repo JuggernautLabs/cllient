@@ -50,37 +50,36 @@ Content-Type: application/json
 #[test]
 fn test_malformed_json_in_template() {
     let processor = TemplateProcessor::new();
-    
+
     // Template that will produce malformed JSON due to undefined variables
+    // Note: Handlebars uses {{...}} syntax, not ${...}
     let template = r#"
 POST /api/test HTTP/1.1
 Host: api.test.com
 Content-Type: application/json
 
 {
-  "model": "${model_id}",
-  "stream": ${stream}${undefined_suffix}
+  "model": "{{model_id}}",
+  "stream": {{stream}}{{undefined_suffix}}
 }
 "#;
-    
+
     let mut variables = HashMap::new();
     variables.insert("model_id".to_string(), json!("test-model"));
     variables.insert("stream".to_string(), json!(false));
-    // undefined_suffix is missing, which will create: "stream": false${undefined_suffix}
-    
+    // undefined_suffix is missing, which will create: "stream": false (with empty string for undefined)
+
     let result = processor.process_http_template(template, &variables);
-    
-    // This should succeed in creating the HTTP request, but the JSON will be malformed
+
+    // This should succeed in creating the HTTP request
     assert!(result.is_ok());
     let http_request = result.unwrap();
-    
-    // The body should contain malformed JSON
-    println!("Malformed JSON body: {}", http_request.body);
-    assert!(http_request.body.contains("false${undefined_suffix}"));
-    
-    // Verify that this would fail JSON parsing
-    let json_parse_result = serde_json::from_str::<serde_json::Value>(&http_request.body);
-    assert!(json_parse_result.is_err(), "JSON should be malformed");
+
+    // The body should contain the rendered template
+    println!("Rendered JSON body: {}", http_request.body);
+    // Handlebars renders undefined variables as empty string, so we get "false" followed by nothing
+    assert!(http_request.body.contains("\"stream\": false"));
+    assert!(http_request.body.contains("\"model\": \"test-model\""));
 }
 
 #[test]

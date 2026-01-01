@@ -29,10 +29,10 @@ path = "src/bin/cllient-utils.rs"
 name = "cllient-registry"
 path = "src/bin/cllient-registry.rs"
 
-[[bin]]
-name = "cllient-hub"
-path = "src/bin/cllient-hub.rs"
-required-features = ["hub"]
+# [[bin]]
+# name = "cllient-hub"
+# path = "src/bin/cllient-hub.rs"
+# required-features = ["hub"]
 
 [dependencies]
 # YAML configuration and JSON
@@ -91,15 +91,17 @@ chrono = "0.4"
 rust-embed = "8.0"
 
 # Plugin/Hub support (optional)
-hub-core = { path = "../hypermemetic/hub-core", optional = true }
-hub-macro = { path = "../hypermemetic/hub-macro", optional = true }
-jsonrpsee = { version = "0.26", features = ["server"], optional = true }
-uuid = { version = "1.6", features = ["v4", "v5"], optional = true }
+# NOTE: hub-core and hub-macro are local dependencies that may not be available
+# Uncomment when hypermemetic workspace is present
+# hub-core = { path = "../hypermemetic/hub-core", optional = true }
+# hub-macro = { path = "../hypermemetic/hub-macro", optional = true }
+# jsonrpsee = { version = "0.26", features = ["server"], optional = true }
+# uuid = { version = "1.6", features = ["v4", "v5"], optional = true }
 
 [features]
 default = []
-plugin = ["dep:hub-core", "dep:hub-macro", "dep:uuid", "dep:jsonrpsee"]
-hub = ["plugin"]
+# plugin = ["dep:hub-core", "dep:hub-macro", "dep:uuid", "dep:jsonrpsee"]
+# hub = ["plugin"]
 
 [dev-dependencies]
 tokio-test = "0.4"

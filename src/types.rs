@@ -633,7 +633,7 @@ impl Message {
     /// # Examples
     /// ```
     /// use cllient::{Message, ImageFormat};
-    /// let image_data = std::fs::read("photo.jpg").unwrap();
+    /// let image_data = vec![0xFF, 0xD8, 0xFF]; // JPEG header bytes
     /// let msg = Message::user("Check this out")
     ///     .add_image(image_data, ImageFormat::Jpeg);
     /// ```
@@ -660,7 +660,7 @@ impl Message {
     /// # Examples
     /// ```
     /// use cllient::{Message, AudioFormat};
-    /// let audio_data = std::fs::read("recording.wav").unwrap();
+    /// let audio_data = vec![0x52, 0x49, 0x46, 0x46]; // WAV header bytes
     /// let msg = Message::user("Transcribe this")
     ///     .add_audio(audio_data, AudioFormat::Wav, Some("recording.wav".to_string()));
     /// ```
@@ -674,7 +674,7 @@ impl Message {
     /// # Examples
     /// ```
     /// use cllient::{Message, DocumentFormat};
-    /// let pdf_data = std::fs::read("document.pdf").unwrap();
+    /// let pdf_data = vec![0x25, 0x50, 0x44, 0x46]; // PDF header bytes
     /// let msg = Message::user("Summarize this document")
     ///     .add_document(pdf_data, DocumentFormat::Pdf, Some("document.pdf".to_string()));
     /// ```
