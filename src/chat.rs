@@ -118,20 +118,11 @@ impl ChatBuilder {
         )?;
         
         let response = client.complete(&self.request_builder.request).await?;
-        
-        // Add the assistant's response to the conversation for future context
-        let _assistant_message = ChatMessage {
-            chatter_id: ChatterId::Agent,
-            content: MessageContent::Text {
-                role: "assistant".to_string(),
-                content: response.content.clone(),
-            },
-        };
-        
-        // Note: We can't mutate self here since we consumed it, but in practice
-        // the user would need to create a new ChatBuilder or we'd need to return
-        // a new one with the updated conversation
-        
+
+        // Note: The assistant's response is not added to the conversation here
+        // because `self` is consumed. In practice, the user would need to create
+        // a new ChatBuilder or we'd need to redesign to return an updated builder.
+
         Ok(response)
     }
     

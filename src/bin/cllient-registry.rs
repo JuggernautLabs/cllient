@@ -757,39 +757,38 @@ fn cmd_verify(
 
     println!("\nSummary: {} passed, {} failed", passed_count, failed_count);
 
-    // Automatically update configs for passing models
-    let mut updated_count = 0;
-    let mut update_errors = Vec::new();
+    // Update configs for passing models if requested
+    if update_configs {
+        let mut updated_count = 0;
+        let mut update_errors = Vec::new();
 
-    for result in &results {
-        if result.success {
-            if let Some(poem) = &result.response {
-                match update_model_config(&result.target, poem) {
-                    Ok(path) => {
-                        updated_count += 1;
-                        println!("  Updated: {}", path.display());
-                    }
-                    Err(e) => {
-                        update_errors.push(format!("{}: {}", result.target, e));
+        for result in &results {
+            if result.success {
+                if let Some(poem) = &result.response {
+                    match update_model_config(&result.target, poem) {
+                        Ok(path) => {
+                            updated_count += 1;
+                            println!("  Updated: {}", path.display());
+                        }
+                        Err(e) => {
+                            update_errors.push(format!("{}: {}", result.target, e));
+                        }
                     }
                 }
             }
         }
-    }
 
-    if updated_count > 0 {
-        println!("\nUpdated {} config file(s) with verification status", updated_count);
-    }
+        if updated_count > 0 {
+            println!("\nUpdated {} config file(s) with verification status", updated_count);
+        }
 
-    if !update_errors.is_empty() {
-        println!("\nConfig update errors:");
-        for err in &update_errors {
-            println!("  - {}", err);
+        if !update_errors.is_empty() {
+            println!("\nConfig update errors:");
+            for err in &update_errors {
+                println!("  - {}", err);
+            }
         }
     }
-
-    // Suppress unused warning - kept for future use
-    let _ = update_configs;
 
     if all_passed {
         ExitCode::SUCCESS

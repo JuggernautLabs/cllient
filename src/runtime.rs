@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::collections::{HashSet, HashMap};
 use regex::Regex;
 use crate::client::ConfigProvider;
 use crate::embedded_config::EmbeddedConfigLoader;
@@ -126,30 +125,16 @@ impl ModelRegistry {
     
     /// List all available model families
     pub fn list_families(&self) -> Vec<String> {
-        let mut families = HashSet::new();
-        
-        for model_id in self.config_provider.list_models() {
-            if let Ok(model_config) = self.config_provider.get_model(model_id) {
-                families.insert(model_config.model.family.clone());
-            }
-        }
-        
-        let mut family_list: Vec<String> = families.into_iter().collect();
-        family_list.sort();
-        family_list
+        // Use the index for O(1) family lookup instead of iterating all models
+        self.index.all_families().into_iter().map(String::from).collect()
     }
-    
+
     /// List models in a specific family
     pub fn list_models_in_family(&self, family: &str) -> Vec<&str> {
-        self.config_provider.list_models()
-            .into_iter()
-            .filter(|model_id| {
-                if let Ok(model_config) = self.config_provider.get_model(model_id) {
-                    model_config.model.family == family
-                } else {
-                    false
-                }
-            })
+        // Use the index for O(1) lookup instead of filtering all models
+        self.index.models_in_family(family)
+            .iter()
+            .map(String::as_str)
             .collect()
     }
 
@@ -174,29 +159,19 @@ impl ModelRegistry {
 
     /// List only verified models
     pub fn list_verified_models(&self) -> Vec<&str> {
-        self.config_provider.list_models()
-            .into_iter()
-            .filter(|model_id| {
-                if let Ok(cfg) = self.config_provider.get_model(model_id) {
-                    cfg.model.status == VerificationStatus::Verified
-                } else {
-                    false
-                }
-            })
+        // Use the index for O(1) status lookup instead of filtering all models
+        self.index.models_with_status(&VerificationStatus::Verified)
+            .iter()
+            .map(String::as_str)
             .collect()
     }
 
     /// List models by verification status
     pub fn list_models_by_status(&self, status: VerificationStatus) -> Vec<&str> {
-        self.config_provider.list_models()
-            .into_iter()
-            .filter(|model_id| {
-                if let Ok(cfg) = self.config_provider.get_model(model_id) {
-                    cfg.model.status == status
-                } else {
-                    false
-                }
-            })
+        // Use the index for O(1) status lookup instead of filtering all models
+        self.index.models_with_status(&status)
+            .iter()
+            .map(String::as_str)
             .collect()
     }
 
@@ -214,41 +189,20 @@ impl ModelRegistry {
     /// This is useful for RPC boundaries where you need to expose
     /// the complete registry state in a single call.
     pub fn export(&self) -> RegistryExport {
-        // Count models per service
-        let mut service_model_counts: HashMap<String, usize> = HashMap::new();
-        let mut verified_count = 0;
-        let mut unverified_count = 0;
+        // Use the index for model counts per service (avoids redundant lookups)
+        let service_model_counts = self.index.model_counts_by_service();
 
-        // Build model exports
+        // Use the index for verification counts (O(1) lookup)
+        let model_status_counts = self.index.model_counts_by_status();
+        let verified_count = model_status_counts.get(&VerificationStatus::Verified).copied().unwrap_or(0);
+        let unverified_count = model_status_counts.get(&VerificationStatus::Unverified).copied().unwrap_or(0);
+
+        // Build model exports using From impl
         let models: Vec<ModelExport> = self.config_provider.list_models()
             .into_iter()
             .filter_map(|model_id| {
                 let cfg = self.config_provider.get_model(model_id).ok()?;
-
-                // Track service usage
-                *service_model_counts.entry(cfg.model.service.clone()).or_insert(0) += 1;
-
-                // Track verification stats
-                if cfg.model.status == VerificationStatus::Verified {
-                    verified_count += 1;
-                } else {
-                    unverified_count += 1;
-                }
-
-                Some(ModelExport {
-                    id: cfg.model.id.clone(),
-                    family: cfg.model.family.clone(),
-                    name: cfg.model.name.clone(),
-                    service: cfg.model.service.clone(),
-                    version: cfg.model.version.clone(),
-                    variant: cfg.model.variant.clone(),
-                    lab: cfg.model.lab.clone(),
-                    status: cfg.model.status.clone(),
-                    capabilities: cfg.capabilities.clone(),
-                    pricing: cfg.pricing.clone(),
-                    constraints: cfg.constraints.clone(),
-                    use_cases: cfg.use_cases.clone(),
-                })
+                Some(ModelExport::from(cfg))
             })
             .collect();
 
@@ -272,11 +226,12 @@ impl ModelRegistry {
                     base_url: cfg.service.base_url.clone(),
                     message_format: cfg.message_builder.clone(),
                     rate_limits,
-                    model_count: *service_model_counts.get(service_name).unwrap_or(&0),
+                    model_count: service_model_counts.get(service_name).copied().unwrap_or(0),
                 })
             })
             .collect();
 
+        // Use the index for families (avoids redundant iteration)
         let families = self.list_families();
 
         RegistryExport {

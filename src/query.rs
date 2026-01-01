@@ -102,28 +102,28 @@ impl<'a, P: ConfigProvider + ?Sized> ModelQuery<'a, P> {
     // === Service Filters ===
 
     /// Filter by exact service name.
-    pub fn service(mut self, name: &str) -> Self {
-        self.filters.push(Filter::Service(name.to_string()));
+    pub fn service(mut self, name: impl Into<String>) -> Self {
+        self.filters.push(Filter::Service(name.into()));
         self
     }
 
     /// Filter by service name pattern (glob-style: * and ?).
-    pub fn service_like(mut self, pattern: &str) -> Self {
-        self.filters.push(Filter::ServicePattern(pattern.to_string()));
+    pub fn service_like(mut self, pattern: impl Into<String>) -> Self {
+        self.filters.push(Filter::ServicePattern(pattern.into()));
         self
     }
 
     // === Family Filters ===
 
     /// Filter by exact family name.
-    pub fn family(mut self, name: &str) -> Self {
-        self.filters.push(Filter::Family(name.to_string()));
+    pub fn family(mut self, name: impl Into<String>) -> Self {
+        self.filters.push(Filter::Family(name.into()));
         self
     }
 
     /// Filter by family name pattern (glob-style).
-    pub fn family_like(mut self, pattern: &str) -> Self {
-        self.filters.push(Filter::FamilyPattern(pattern.to_string()));
+    pub fn family_like(mut self, pattern: impl Into<String>) -> Self {
+        self.filters.push(Filter::FamilyPattern(pattern.into()));
         self
     }
 
@@ -149,37 +149,43 @@ impl<'a, P: ConfigProvider + ?Sized> ModelQuery<'a, P> {
 
     /// Filter by vision capability.
     pub fn with_vision(mut self) -> Self {
-        self.filters.push(Filter::Capability(CapabilityFilter::Vision(true)));
+        self.filters
+            .push(Filter::Capability(CapabilityFilter::Vision(true)));
         self
     }
 
     /// Filter by streaming capability.
     pub fn with_streaming(mut self) -> Self {
-        self.filters.push(Filter::Capability(CapabilityFilter::Streaming(true)));
+        self.filters
+            .push(Filter::Capability(CapabilityFilter::Streaming(true)));
         self
     }
 
     /// Filter by function calling capability.
     pub fn with_functions(mut self) -> Self {
-        self.filters.push(Filter::Capability(CapabilityFilter::Functions(true)));
+        self.filters
+            .push(Filter::Capability(CapabilityFilter::Functions(true)));
         self
     }
 
     /// Filter by JSON mode capability.
     pub fn with_json_mode(mut self) -> Self {
-        self.filters.push(Filter::Capability(CapabilityFilter::JsonMode(true)));
+        self.filters
+            .push(Filter::Capability(CapabilityFilter::JsonMode(true)));
         self
     }
 
     /// Filter by system prompt support.
     pub fn with_system_prompt(mut self) -> Self {
-        self.filters.push(Filter::Capability(CapabilityFilter::SystemPrompt(true)));
+        self.filters
+            .push(Filter::Capability(CapabilityFilter::SystemPrompt(true)));
         self
     }
 
     /// Filter by multimodal capability.
     pub fn with_multimodal(mut self) -> Self {
-        self.filters.push(Filter::Capability(CapabilityFilter::Multimodal(true)));
+        self.filters
+            .push(Filter::Capability(CapabilityFilter::Multimodal(true)));
         self
     }
 
@@ -229,21 +235,21 @@ impl<'a, P: ConfigProvider + ?Sized> ModelQuery<'a, P> {
     // === Search Filters ===
 
     /// Fuzzy search on model ID and name.
-    pub fn fuzzy(mut self, query: &str) -> Self {
-        self.filters.push(Filter::Fuzzy(query.to_string()));
+    pub fn fuzzy(mut self, query: impl Into<String>) -> Self {
+        self.filters.push(Filter::Fuzzy(query.into()));
         self.order_by = OrderBy::FuzzyScore;
         self
     }
 
     /// Filter by exact model ID.
-    pub fn model_id(mut self, id: &str) -> Self {
-        self.filters.push(Filter::ModelId(id.to_string()));
+    pub fn model_id(mut self, id: impl Into<String>) -> Self {
+        self.filters.push(Filter::ModelId(id.into()));
         self
     }
 
     /// Filter by model ID pattern (glob-style).
-    pub fn model_id_like(mut self, pattern: &str) -> Self {
-        self.filters.push(Filter::ModelIdPattern(pattern.to_string()));
+    pub fn model_id_like(mut self, pattern: impl Into<String>) -> Self {
+        self.filters.push(Filter::ModelIdPattern(pattern.into()));
         self
     }
 
@@ -306,7 +312,9 @@ impl<'a, P: ConfigProvider + ?Sized> ModelQuery<'a, P> {
             .min_by(|(id_a, _), (id_b, _)| {
                 let cost_a = self.get_model_cost(id_a);
                 let cost_b = self.get_model_cost(id_b);
-                cost_a.partial_cmp(&cost_b).unwrap_or(std::cmp::Ordering::Equal)
+                cost_a
+                    .partial_cmp(&cost_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(id, _)| id)
     }
@@ -337,7 +345,11 @@ impl<'a, P: ConfigProvider + ?Sized> ModelQuery<'a, P> {
         candidates
     }
 
-    fn apply_filter<'b>(&self, candidates: Vec<(&'b str, i64)>, filter: &Filter) -> Vec<(&'b str, i64)> {
+    fn apply_filter<'b>(
+        &self,
+        candidates: Vec<(&'b str, i64)>,
+        filter: &Filter,
+    ) -> Vec<(&'b str, i64)> {
         match filter {
             Filter::Service(name) => candidates
                 .into_iter()
@@ -395,7 +407,10 @@ impl<'a, P: ConfigProvider + ?Sized> ModelQuery<'a, P> {
                 .filter(|(id, _)| self.check_capability(id, cap))
                 .collect(),
 
-            Filter::PriceRange { max_input, max_output } => candidates
+            Filter::PriceRange {
+                max_input,
+                max_output,
+            } => candidates
                 .into_iter()
                 .filter(|(id, _)| {
                     if let Ok(m) = self.provider.get_model(id) {
@@ -433,11 +448,18 @@ impl<'a, P: ConfigProvider + ?Sized> ModelQuery<'a, P> {
                 .collect(),
 
             Filter::Fuzzy(query) => {
+                // Cache lowercase query once for all candidates
                 let query_lower = query.to_lowercase();
+                // Pre-split query words once for reuse in fuzzy scoring
+                let query_words: Vec<&str> = query_lower
+                    .split(|c: char| c.is_whitespace() || c == '-' || c == '_')
+                    .filter(|s| !s.is_empty())
+                    .collect();
                 candidates
                     .into_iter()
                     .filter_map(|(id, _)| {
-                        let score = self.fuzzy_score(id, &query_lower);
+                        let score =
+                            self.fuzzy_score_with_cached_query(id, &query_lower, &query_words);
                         if score > 0 {
                             Some((id, score))
                         } else {
@@ -484,14 +506,18 @@ impl<'a, P: ConfigProvider + ?Sized> ModelQuery<'a, P> {
                 results.sort_by(|(a, _), (b, _)| {
                     let cost_a = self.get_model_cost(a);
                     let cost_b = self.get_model_cost(b);
-                    cost_a.partial_cmp(&cost_b).unwrap_or(std::cmp::Ordering::Equal)
+                    cost_a
+                        .partial_cmp(&cost_b)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 });
             }
             OrderBy::PriceDesc => {
                 results.sort_by(|(a, _), (b, _)| {
                     let cost_a = self.get_model_cost(a);
                     let cost_b = self.get_model_cost(b);
-                    cost_b.partial_cmp(&cost_a).unwrap_or(std::cmp::Ordering::Equal)
+                    cost_b
+                        .partial_cmp(&cost_a)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 });
             }
             OrderBy::ContextDesc => {
@@ -538,52 +564,60 @@ impl<'a, P: ConfigProvider + ?Sized> ModelQuery<'a, P> {
         Regex::new(&regex_pattern).unwrap_or_else(|_| Regex::new("^$").unwrap())
     }
 
-    /// Simple fuzzy matching score.
+    /// Optimized fuzzy matching with pre-cached lowercase query and query words.
     /// Returns higher scores for better matches.
-    fn fuzzy_score(&self, model_id: &str, query: &str) -> i64 {
-        let id_lower = model_id.to_lowercase();
-
-        // Get model name for additional matching
-        let name_lower = self
-            .provider
-            .get_model(model_id)
-            .map(|m| m.model.name.to_lowercase())
-            .unwrap_or_default();
-
-        let mut score = 0i64;
-
-        // Exact match is highest
-        if id_lower == query {
+    fn fuzzy_score_with_cached_query(
+        &self,
+        model_id: &str,
+        query_lower: &str,
+        query_words: &[&str],
+    ) -> i64 {
+        // Use eq_ignore_ascii_case for exact match checks to avoid allocation
+        if model_id.eq_ignore_ascii_case(query_lower) {
             return 1000;
         }
-        if name_lower == query {
+
+        // Get model name for additional matching
+        let model_name = self
+            .provider
+            .get_model(model_id)
+            .map(|m| m.model.name.as_str())
+            .unwrap_or("");
+
+        if model_name.eq_ignore_ascii_case(query_lower) {
             return 900;
         }
 
+        let mut score = 0i64;
+
+        // For substring checks, we need lowercase versions
+        // Cache these once per model instead of repeatedly
+        let id_lower = model_id.to_lowercase();
+        let name_lower = model_name.to_lowercase();
+
         // Contains full query
-        if id_lower.contains(query) {
+        if id_lower.contains(query_lower) {
             score += 500;
         }
-        if name_lower.contains(query) {
+        if name_lower.contains(query_lower) {
             score += 400;
         }
 
         // Starts with query
-        if id_lower.starts_with(query) {
+        if id_lower.starts_with(query_lower) {
             score += 200;
         }
-        if name_lower.starts_with(query) {
+        if name_lower.starts_with(query_lower) {
             score += 150;
         }
 
-        // Check for word matches (split query by spaces/hyphens)
-        let query_words: Vec<&str> = query.split(|c: char| c.is_whitespace() || c == '-' || c == '_').collect();
-        let id_words: Vec<&str> = id_lower.split(|c: char| c.is_whitespace() || c == '-' || c == '_').collect();
+        // Check for word matches using pre-split query words
+        let id_words: Vec<&str> = id_lower
+            .split(|c: char| c.is_whitespace() || c == '-' || c == '_')
+            .filter(|s| !s.is_empty())
+            .collect();
 
-        for query_word in &query_words {
-            if query_word.is_empty() {
-                continue;
-            }
+        for query_word in query_words {
             // Exact word match
             if id_words.contains(query_word) {
                 score += 100;

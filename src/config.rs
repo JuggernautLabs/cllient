@@ -1,141 +1,148 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::fs;
 use std::fmt;
+use std::fs;
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+
 use crate::error::{ClientError, ConfigError, Result};
 
-/// Message builder format - determines how messages are structured for the API
-#[derive(Debug, Clone, PartialEq, Eq, Default, JsonSchema)]
-pub enum MessageFormat {
-    /// OpenAI-compatible message format (used by OpenAI, DeepSeek, Azure, most providers)
-    #[default]
-    OpenAI,
-    /// Anthropic Claude message format
-    Anthropic,
-    /// Google Gemini message format
-    Google,
-    /// Custom message builder (for extensibility)
-    Custom(String),
-}
-
-impl fmt::Display for MessageFormat {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MessageFormat::OpenAI => write!(f, "openai"),
-            MessageFormat::Anthropic => write!(f, "anthropic"),
-            MessageFormat::Google => write!(f, "google"),
-            MessageFormat::Custom(s) => write!(f, "{}", s),
+/// Macro to implement Display, Serialize, and Deserialize for enums with a Custom(String) fallback.
+/// Each variant maps to a string representation; unknown strings become Custom(s).
+macro_rules! impl_string_enum {
+    // Case-insensitive variant
+    (
+        $(#[$meta:meta])*
+        $vis:vis enum $name:ident {
+            $( $(#[$variant_meta:meta])* $variant:ident => $str:literal ),* $(,)?
         }
-    }
-}
+        default: $default_variant:ident
+        case_insensitive: true
+    ) => {
+        impl_string_enum!(@impl
+            $(#[$meta])*
+            $vis enum $name {
+                $( $(#[$variant_meta])* $variant => $str ),*
+            }
+            default: $default_variant
+            match_fn: |s: &str| s.to_lowercase()
+        );
+    };
 
-impl Serialize for MessageFormat {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where S: serde::Serializer {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl<'de> Deserialize<'de> for MessageFormat {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where D: serde::Deserializer<'de> {
-        let s = String::deserialize(deserializer)?;
-        Ok(match s.to_lowercase().as_str() {
-            "openai" => MessageFormat::OpenAI,
-            "anthropic" => MessageFormat::Anthropic,
-            "google" => MessageFormat::Google,
-            _ => MessageFormat::Custom(s),
-        })
-    }
-}
-
-/// SSE parser type - determines how to parse streaming responses
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum SseParser {
-    /// OpenAI-compatible SSE format
-    #[default]
-    OpenAiSse,
-    /// Anthropic Claude SSE format
-    AnthropicSse,
-    /// Google Gemini SSE format
-    GoogleSse,
-    /// Custom SSE parser (for extensibility)
-    Custom(String),
-}
-
-impl fmt::Display for SseParser {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            SseParser::OpenAiSse => write!(f, "openai_sse"),
-            SseParser::AnthropicSse => write!(f, "anthropic_sse"),
-            SseParser::GoogleSse => write!(f, "google_sse"),
-            SseParser::Custom(s) => write!(f, "{}", s),
+    // Case-sensitive variant (default)
+    (
+        $(#[$meta:meta])*
+        $vis:vis enum $name:ident {
+            $( $(#[$variant_meta:meta])* $variant:ident => $str:literal ),* $(,)?
         }
-    }
-}
+        default: $default_variant:ident
+    ) => {
+        impl_string_enum!(@impl
+            $(#[$meta])*
+            $vis enum $name {
+                $( $(#[$variant_meta])* $variant => $str ),*
+            }
+            default: $default_variant
+            match_fn: |s: &str| s.to_string()
+        );
+    };
 
-impl Serialize for SseParser {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where S: serde::Serializer {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl<'de> Deserialize<'de> for SseParser {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where D: serde::Deserializer<'de> {
-        let s = String::deserialize(deserializer)?;
-        Ok(match s.as_str() {
-            "openai_sse" => SseParser::OpenAiSse,
-            "anthropic_sse" => SseParser::AnthropicSse,
-            "google_sse" => SseParser::GoogleSse,
-            _ => SseParser::Custom(s),
-        })
-    }
-}
-
-/// Streaming format type
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum StreamingFormat {
-    /// Server-Sent Events (text/event-stream)
-    #[default]
-    TextEventStream,
-    /// Newline-delimited JSON
-    Ndjson,
-    /// Custom streaming format
-    Custom(String),
-}
-
-impl fmt::Display for StreamingFormat {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            StreamingFormat::TextEventStream => write!(f, "text/event-stream"),
-            StreamingFormat::Ndjson => write!(f, "application/x-ndjson"),
-            StreamingFormat::Custom(s) => write!(f, "{}", s),
+    // Internal implementation
+    (@impl
+        $(#[$meta:meta])*
+        $vis:vis enum $name:ident {
+            $( $(#[$variant_meta:meta])* $variant:ident => $str:literal ),* $(,)?
         }
-    }
+        default: $default_variant:ident
+        match_fn: $match_fn:expr
+    ) => {
+        $(#[$meta])*
+        $vis enum $name {
+            $( $(#[$variant_meta])* $variant, )*
+            /// Custom variant for extensibility
+            Custom(String),
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                $name::$default_variant
+            }
+        }
+
+        impl fmt::Display for $name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self {
+                    $( $name::$variant => write!(f, $str), )*
+                    $name::Custom(s) => write!(f, "{}", s),
+                }
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(&self.to_string())
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let s = String::deserialize(deserializer)?;
+                let match_fn: fn(&str) -> String = $match_fn;
+                Ok(match match_fn(&s).as_str() {
+                    $( $str => $name::$variant, )*
+                    _ => $name::Custom(s),
+                })
+            }
+        }
+    };
 }
 
-impl Serialize for StreamingFormat {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where S: serde::Serializer {
-        serializer.serialize_str(&self.to_string())
+impl_string_enum! {
+    /// Message builder format - determines how messages are structured for the API
+    #[derive(Debug, Clone, PartialEq, Eq, JsonSchema)]
+    pub enum MessageFormat {
+        /// OpenAI-compatible message format (used by OpenAI, DeepSeek, Azure, most providers)
+        OpenAI => "openai",
+        /// Anthropic Claude message format
+        Anthropic => "anthropic",
+        /// Google Gemini message format
+        Google => "google",
     }
+    default: OpenAI
+    case_insensitive: true
 }
 
-impl<'de> Deserialize<'de> for StreamingFormat {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where D: serde::Deserializer<'de> {
-        let s = String::deserialize(deserializer)?;
-        Ok(match s.as_str() {
-            "text/event-stream" => StreamingFormat::TextEventStream,
-            "application/x-ndjson" => StreamingFormat::Ndjson,
-            _ => StreamingFormat::Custom(s),
-        })
+impl_string_enum! {
+    /// SSE parser type - determines how to parse streaming responses
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub enum SseParser {
+        /// OpenAI-compatible SSE format
+        OpenAiSse => "openai_sse",
+        /// Anthropic Claude SSE format
+        AnthropicSse => "anthropic_sse",
+        /// Google Gemini SSE format
+        GoogleSse => "google_sse",
     }
+    default: OpenAiSse
+}
+
+impl_string_enum! {
+    /// Streaming format type
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub enum StreamingFormat {
+        /// Server-Sent Events (text/event-stream)
+        TextEventStream => "text/event-stream",
+        /// Newline-delimited JSON
+        Ndjson => "application/x-ndjson",
+    }
+    default: TextEventStream
 }
 
 /// Currency for pricing

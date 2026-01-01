@@ -63,8 +63,8 @@ impl SSEFormat {
         T: DeserializeOwned + JsonSchema + Send + 'static,
     {
         match self {
-            SSEFormat::OpenAI => Box::new(OpenAISSEProvider),
-            SSEFormat::Claude => Box::new(ClaudeSSEProvider),
+            SSEFormat::OpenAI => Box::new(sse::openai_provider()),
+            SSEFormat::Claude => Box::new(sse::claude_provider()),
         }
     }
 }
@@ -225,7 +225,10 @@ where
 pub mod sse;
 
 // Re-export SSE providers for convenience
-pub use sse::{OpenAISSEProvider, ClaudeSSEProvider, stream_from_sse_bytes};
+pub use sse::{
+    ConfigurableSSEProvider, OpenAISSEProvider, ClaudeSSEProvider,
+    openai_provider, claude_provider, stream_from_sse_bytes
+};
 
 // Re-export compatibility layer
 pub use compat::{StreamEvent, StreamProcessor, StreamEventExt};

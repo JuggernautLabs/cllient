@@ -84,20 +84,33 @@ impl RegistryIndex {
     /// This iterates through all services and models once to build
     /// all the lookup tables.
     pub fn build<P: ConfigProvider>(provider: &P) -> Self {
+        use std::collections::hash_map::Entry;
+
         let mut index = Self::default();
 
-        // Collect all services and their statuses
-        let services: Vec<String> = provider.list_services().iter().map(|s| s.to_string()).collect();
-        index.all_services = services.clone();
+        // Collect all services - convert to owned strings once
+        let services: Vec<String> = provider
+            .list_services()
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        // Pre-allocate capacity based on expected sizes
+        index.service_to_models.reserve(services.len());
+        index.service_statuses.reserve(services.len());
 
         // Initialize service_to_models with empty vecs and track service statuses
         for service_name in &services {
-            index.service_to_models.insert(service_name.clone(), Vec::new());
+            index
+                .service_to_models
+                .insert(service_name.clone(), Vec::new());
 
             // Get service status
             if let Ok(service_config) = provider.get_service(service_name) {
                 let status = service_config.service.status.clone();
-                index.service_statuses.insert(service_name.clone(), status.clone());
+                index
+                    .service_statuses
+                    .insert(service_name.clone(), status.clone());
                 index
                     .service_status_to_services
                     .entry(status)
@@ -106,9 +119,16 @@ impl RegistryIndex {
             }
         }
 
+        // Store all_services after we're done using services
+        index.all_services = services;
+
         // Collect all models and build mappings
-        for model_id in provider.list_models() {
-            index.all_models.push(model_id.to_string());
+        let model_ids: Vec<&str> = provider.list_models();
+        index.all_models.reserve(model_ids.len());
+        index.model_to_service.reserve(model_ids.len());
+
+        for model_id in model_ids {
+            let model_id_owned = model_id.to_string();
 
             if let Ok(model_config) = provider.get_model(model_id) {
                 let service_name = &model_config.model.service;
@@ -116,22 +136,23 @@ impl RegistryIndex {
                 let status = &model_config.model.status;
 
                 // Forward mapping: model → service
-                index.model_to_service.insert(model_id.to_string(), service_name.clone());
+                index
+                    .model_to_service
+                    .insert(model_id_owned.clone(), service_name.clone());
 
-                // Reverse mapping: service → models
-                if index.service_to_models.contains_key(service_name) {
-                    index
-                        .service_to_models
-                        .get_mut(service_name)
-                        .unwrap()
-                        .push(model_id.to_string());
-                } else {
-                    // Service doesn't exist - this is a broken reference
-                    index.broken_refs.push(BrokenReference {
-                        model_id: model_id.to_string(),
-                        referenced_service: service_name.clone(),
-                        config_path: None,
-                    });
+                // Reverse mapping: service → models (use entry API to avoid double lookup)
+                match index.service_to_models.entry(service_name.clone()) {
+                    Entry::Occupied(mut entry) => {
+                        entry.get_mut().push(model_id_owned.clone());
+                    }
+                    Entry::Vacant(_) => {
+                        // Service doesn't exist - this is a broken reference
+                        index.broken_refs.push(BrokenReference {
+                            model_id: model_id_owned.clone(),
+                            referenced_service: service_name.clone(),
+                            config_path: None,
+                        });
+                    }
                 }
 
                 // Family grouping
@@ -139,35 +160,43 @@ impl RegistryIndex {
                     .family_to_models
                     .entry(family.clone())
                     .or_default()
-                    .push(model_id.to_string());
+                    .push(model_id_owned.clone());
 
                 // Status grouping
                 index
                     .status_to_models
                     .entry(status.clone())
                     .or_default()
-                    .push(model_id.to_string());
+                    .push(model_id_owned.clone());
             }
+
+            index.all_models.push(model_id_owned);
         }
 
-        // Find orphan services (services with no models)
-        for (service, models) in &index.service_to_models {
-            if models.is_empty() {
-                index.orphan_services.push(service.clone());
-            }
-        }
+        // Find orphan services (services with no models) and sort in one pass
+        index.orphan_services = index
+            .service_to_models
+            .iter()
+            .filter_map(|(service, models)| {
+                if models.is_empty() {
+                    Some(service.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        index.orphan_services.sort_unstable();
 
-        // Sort for consistent ordering
-        index.orphan_services.sort();
-        index.all_models.sort();
+        // Sort for consistent ordering (use sort_unstable for better performance)
+        index.all_models.sort_unstable();
         for models in index.service_to_models.values_mut() {
-            models.sort();
+            models.sort_unstable();
         }
         for models in index.family_to_models.values_mut() {
-            models.sort();
+            models.sort_unstable();
         }
         for models in index.status_to_models.values_mut() {
-            models.sort();
+            models.sort_unstable();
         }
 
         index
@@ -261,7 +290,7 @@ impl RegistryIndex {
     /// Get all families.
     pub fn all_families(&self) -> Vec<&str> {
         let mut families: Vec<&str> = self.family_to_models.keys().map(String::as_str).collect();
-        families.sort();
+        families.sort_unstable();
         families
     }
 
@@ -306,11 +335,23 @@ impl RegistryIndex {
         let service_status_counts = self.service_counts_by_status();
         IndexStats {
             total_services: self.all_services.len(),
-            verified_services: service_status_counts.get(&VerificationStatus::Verified).copied().unwrap_or(0),
-            unverified_services: service_status_counts.get(&VerificationStatus::Unverified).copied().unwrap_or(0),
+            verified_services: service_status_counts
+                .get(&VerificationStatus::Verified)
+                .copied()
+                .unwrap_or(0),
+            unverified_services: service_status_counts
+                .get(&VerificationStatus::Unverified)
+                .copied()
+                .unwrap_or(0),
             total_models: self.all_models.len(),
-            verified_models: model_status_counts.get(&VerificationStatus::Verified).copied().unwrap_or(0),
-            unverified_models: model_status_counts.get(&VerificationStatus::Unverified).copied().unwrap_or(0),
+            verified_models: model_status_counts
+                .get(&VerificationStatus::Verified)
+                .copied()
+                .unwrap_or(0),
+            unverified_models: model_status_counts
+                .get(&VerificationStatus::Unverified)
+                .copied()
+                .unwrap_or(0),
             total_families: self.family_to_models.len(),
             orphan_services: self.orphan_services.len(),
             broken_refs: self.broken_refs.len(),

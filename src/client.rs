@@ -19,49 +19,24 @@ pub trait ConfigProvider {
     fn get_model_with_service(&self, model_id: &str) -> Result<(&ModelConfig, &ServiceConfig)>;
 }
 
-impl ConfigProvider for ConfigLoader {
-    fn get_service(&self, name: &str) -> Result<&ServiceConfig> {
-        self.get_service(name)
-    }
-    
-    fn get_model(&self, id: &str) -> Result<&ModelConfig> {
-        self.get_model(id)
-    }
-    
-    fn list_services(&self) -> Vec<&str> {
-        self.list_services()
-    }
-    
-    fn list_models(&self) -> Vec<&str> {
-        self.list_models()
-    }
-    
-    fn get_model_with_service(&self, model_id: &str) -> Result<(&ModelConfig, &ServiceConfig)> {
-        self.get_model_with_service(model_id)
-    }
+/// Implements ConfigProvider by delegating to inherent methods with matching signatures.
+macro_rules! impl_config_provider {
+    ($($ty:ty),+ $(,)?) => {
+        $(
+            impl ConfigProvider for $ty {
+                fn get_service(&self, name: &str) -> Result<&ServiceConfig> { self.get_service(name) }
+                fn get_model(&self, id: &str) -> Result<&ModelConfig> { self.get_model(id) }
+                fn list_services(&self) -> Vec<&str> { self.list_services() }
+                fn list_models(&self) -> Vec<&str> { self.list_models() }
+                fn get_model_with_service(&self, model_id: &str) -> Result<(&ModelConfig, &ServiceConfig)> {
+                    self.get_model_with_service(model_id)
+                }
+            }
+        )+
+    };
 }
 
-impl ConfigProvider for EmbeddedConfigLoader {
-    fn get_service(&self, name: &str) -> Result<&ServiceConfig> {
-        self.get_service(name)
-    }
-    
-    fn get_model(&self, id: &str) -> Result<&ModelConfig> {
-        self.get_model(id)
-    }
-    
-    fn list_services(&self) -> Vec<&str> {
-        self.list_services()
-    }
-    
-    fn list_models(&self) -> Vec<&str> {
-        self.list_models()
-    }
-    
-    fn get_model_with_service(&self, model_id: &str) -> Result<(&ModelConfig, &ServiceConfig)> {
-        self.get_model_with_service(model_id)
-    }
-}
+impl_config_provider!(ConfigLoader, EmbeddedConfigLoader);
 
 /// Core trait for low-level LLM client operations
 #[async_trait]

@@ -1,10 +1,102 @@
 use handlebars::{Handlebars, Helper, Context, RenderContext, Output, HelperResult};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::OnceLock;
 use regex::Regex;
 use base64::Engine;
 use crate::error::{ClientError, Result};
 use tracing::{debug, trace};
+
+// ============================================================================
+// Static Regex Patterns
+// ============================================================================
+// These regexes are compiled once at first use and cached for the lifetime of
+// the program, avoiding repeated compilation in hot paths.
+
+/// Regex for matching environment variable placeholders like ${VAR_NAME}
+fn env_var_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(r"\$\{([A-Z_][A-Z0-9_]*)\}")
+            .expect("ENV_VAR_REGEX pattern is invalid")
+    })
+}
+
+/// Regex for cleaning trailing commas before closing braces/brackets in JSON
+fn trailing_comma_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(r#",(\s*[}\]])"#)
+            .expect("TRAILING_COMMA_REGEX pattern is invalid")
+    })
+}
+
+// Sensitive pattern regexes for log sanitization
+// These are grouped together as they're all used in sanitize_for_logging
+
+fn auth_bearer_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(r"(?i)(authorization:\s*bearer\s+)([^\s\n]+)")
+            .expect("AUTH_BEARER_REGEX pattern is invalid")
+    })
+}
+
+fn x_api_key_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(r"(?i)(x-api-key:\s*)([^\s\n]+)")
+            .expect("X_API_KEY_REGEX pattern is invalid")
+    })
+}
+
+fn api_key_header_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(r"(?i)(api-key:\s*)([^\s\n]+)")
+            .expect("API_KEY_HEADER_REGEX pattern is invalid")
+    })
+}
+
+fn anthropic_api_key_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(r"(?i)(anthropic-version:\s*[^\n]*\n\s*x-api-key:\s*)([^\s\n]+)")
+            .expect("ANTHROPIC_API_KEY_REGEX pattern is invalid")
+    })
+}
+
+fn openai_api_key_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(r"(?i)(openai-api-key:\s*)([^\s\n]+)")
+            .expect("OPENAI_API_KEY_REGEX pattern is invalid")
+    })
+}
+
+fn json_api_key_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(r#"(?i)("api_key":\s*")([^"]+)""#)
+            .expect("JSON_API_KEY_REGEX pattern is invalid")
+    })
+}
+
+fn json_key_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(r#"(?i)("key":\s*")([^"]+)""#)
+            .expect("JSON_KEY_REGEX pattern is invalid")
+    })
+}
+
+fn sk_token_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(r"(sk-[a-zA-Z0-9]{20,})")
+            .expect("SK_TOKEN_REGEX pattern is invalid")
+    })
+}
 
 pub struct TemplateProcessor {
     handlebars: Handlebars<'static>,
@@ -57,9 +149,7 @@ impl TemplateProcessor {
     }
 
     fn substitute_env_vars(&self, template: &str) -> Result<String> {
-        let env_var_regex = Regex::new(r"\$\{([A-Z_][A-Z0-9_]*)\}").unwrap();
-        
-        let result = env_var_regex.replace_all(template, |caps: &regex::Captures| {
+        let result = env_var_regex().replace_all(template, |caps: &regex::Captures| {
             let var_name = &caps[1];
             std::env::var(var_name).unwrap_or_else(|_| {
                 format!("${{{}}}", var_name) // Keep original if not found
@@ -72,32 +162,28 @@ impl TemplateProcessor {
     /// Sanitize sensitive information for logging by replacing API keys and auth tokens with asterisks
     fn sanitize_for_logging(&self, content: &str) -> String {
         let mut sanitized = content.to_string();
-        
-        // List of common API key patterns to redact
-        let sensitive_patterns = vec![
-            // Authorization headers (Bearer token)
-            (Regex::new(r"(?i)(authorization:\s*bearer\s+)([^\s\n]+)").unwrap(), "${1}*****"),
-            
-            // Common API key headers
-            (Regex::new(r"(?i)(x-api-key:\s*)([^\s\n]+)").unwrap(), "${1}*****"),
-            (Regex::new(r"(?i)(api-key:\s*)([^\s\n]+)").unwrap(), "${1}*****"),
-            (Regex::new(r"(?i)(anthropic-version:\s*[^\n]*\n\s*x-api-key:\s*)([^\s\n]+)").unwrap(), "${1}*****"),
-            
-            // OpenAI specific headers  
-            (Regex::new(r"(?i)(openai-api-key:\s*)([^\s\n]+)").unwrap(), "${1}*****"),
-            
-            // API keys in JSON bodies
-            (Regex::new(r#"(?i)("api_key":\s*")([^"]+)""#).unwrap(), r#"${1}*****""#),
-            (Regex::new(r#"(?i)("key":\s*")([^"]+)""#).unwrap(), r#"${1}*****""#),
-            
-            // JWT-like tokens (long base64-ish strings) - should go after Bearer pattern
-            (Regex::new(r"(sk-[a-zA-Z0-9]{20,})").unwrap(), "*****"),
-        ];
-        
-        for (pattern, replacement) in sensitive_patterns {
-            sanitized = pattern.replace_all(&sanitized, replacement).to_string();
-        }
-        
+
+        // Apply each sensitive pattern regex with its replacement
+        // Order matters: more specific patterns should come before general ones
+
+        // Authorization headers (Bearer token)
+        sanitized = auth_bearer_regex().replace_all(&sanitized, "${1}*****").to_string();
+
+        // Common API key headers
+        sanitized = x_api_key_regex().replace_all(&sanitized, "${1}*****").to_string();
+        sanitized = api_key_header_regex().replace_all(&sanitized, "${1}*****").to_string();
+        sanitized = anthropic_api_key_regex().replace_all(&sanitized, "${1}*****").to_string();
+
+        // OpenAI specific headers
+        sanitized = openai_api_key_regex().replace_all(&sanitized, "${1}*****").to_string();
+
+        // API keys in JSON bodies
+        sanitized = json_api_key_regex().replace_all(&sanitized, r#"${1}*****""#).to_string();
+        sanitized = json_key_regex().replace_all(&sanitized, r#"${1}*****""#).to_string();
+
+        // JWT-like tokens (long base64-ish strings) - should go after Bearer pattern
+        sanitized = sk_token_regex().replace_all(&sanitized, "*****").to_string();
+
         sanitized
     }
 
@@ -148,11 +234,10 @@ impl TemplateProcessor {
         }
         
         let mut result = cleaned_lines.join("\n");
-        
+
         // Remove trailing commas before closing braces
-        let trailing_comma_regex = Regex::new(r#",(\s*[}\]])"#).unwrap();
-        result = trailing_comma_regex.replace_all(&result, "$1").to_string();
-        
+        result = trailing_comma_regex().replace_all(&result, "$1").to_string();
+
         Ok(result)
     }
 
