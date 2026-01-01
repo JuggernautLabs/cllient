@@ -35,9 +35,9 @@ cllient list "o[0-9]"           # o1, o3, o4 models
 cllient list ".*-4.*"           # models with '4' in family
 cllient list "^(gpt|claude)$"   # exact matches
 
-# JSON output
-cllient --json list
-cllient --json list claude
+# JSON output (default when --pretty is not used)
+cllient list
+cllient list claude
 
 # With verbose output
 cllient --verbose list
@@ -53,8 +53,8 @@ List all configured services (HTTP providers).
 # List all configured services
 cllient list-services
 
-# JSON output
-cllient --json list-services
+# JSON output (default)
+cllient list-services
 ```
 
 ### `ask` - Single Completion Request
@@ -72,8 +72,8 @@ cllient ask gpt-4o-mini "What is the capital of France?"
 cllient ask claude-3-opus-20240229 "Explain machine learning"
 cllient ask deepseek-chat "Write a Python function to sort a list"
 
-# JSON output
-cllient --json ask gpt-4o-mini "What is 2+2?"
+# JSON output (default)
+cllient ask gpt-4o-mini "What is 2+2?"
 ```
 
 ### `stream` - Real-time Streaming Response
@@ -171,6 +171,34 @@ cllient compare gpt-3.5-turbo,claude-3-opus-20240229,deepseek-chat "Explain recu
 cllient compare gpt-4-turbo,claude-3-5-sonnet-20241022 "Write a haiku about programming"
 ```
 
+### `debug-response` - Debug API Response Issues
+
+Debug and analyze API responses when troubleshooting issues with specific models.
+
+> **Implementation**: [`debug_raw_response handler`](../src/bin/cllient.rs)
+
+```bash
+# Debug a specific model's API response
+cllient debug-response <model> "<prompt>"
+
+# Examples
+cllient debug-response gpt-4o-mini "Say hello"
+cllient debug-response claude-3-haiku-20240307 "Test"
+
+# Output includes:
+# - Request status (success/failure)
+# - Response content
+# - Token usage statistics
+# - Detailed error analysis with troubleshooting hints
+```
+
+This command provides detailed diagnostics including:
+- JSON path errors (API response structure mismatches)
+- Authentication errors (401)
+- Not found errors (404)
+- Rate limit errors (429)
+- General connectivity troubleshooting
+
 ## CLI Flags and Options
 
 ### Global Flags
@@ -185,11 +213,20 @@ cllient --pretty list
 cllient --pretty ask gpt-4o-mini "Hello"
 cllient --pretty stream claude-3-haiku-20240307 "Count to 5"
 
+# Clean output (LLM response only, no formatting - ideal for piping)
+cllient --clean ask gpt-4o-mini "Hello"
+cllient --clean stream deepseek-chat "Count to 5" | wc -w
+
 # Combine flags
 cllient --verbose --pretty list claude
 ```
 
-**Note**: Most commands default to JSON output. Use `--pretty` for human-readable output with emoji decorators.
+**Output Modes:**
+- Default: JSON output (structured, machine-readable)
+- `--pretty`: Human-readable output with emoji decorators
+- `--clean`: Raw LLM response only (no formatting, perfect for piping)
+
+**Note**: `--pretty` and `--clean` are mutually exclusive. If neither is specified, JSON output is used.
 
 ### Environment Variables
 
@@ -344,6 +381,336 @@ cllient --help
 # Show help for specific command
 cllient ask --help
 cllient stream --help
+```
+
+---
+
+## cllient-registry - Registry Validation and Inspection
+
+The `cllient-registry` CLI provides tools for validating and inspecting the model registry.
+
+> **Source Code**: [`src/bin/cllient-registry.rs`](../src/bin/cllient-registry.rs)
+
+### Installation
+
+```bash
+cargo install --path . --bin cllient-registry
+```
+
+### Global Options
+
+```bash
+# Output format (table, json, yaml)
+cllient-registry --format json <command>
+cllient-registry -f yaml <command>
+```
+
+### `validate` - Validate Registry Configurations
+
+Run validation checks on registry configurations.
+
+```bash
+# Validate all configs with all levels
+cllient-registry validate
+
+# Validate with specific levels
+cllient-registry validate --level schema
+cllient-registry validate --level crossref
+cllient-registry validate --level semantic
+cllient-registry validate --level live
+cllient-registry validate --level schema,crossref
+
+# Validate a specific model
+cllient-registry validate --model gpt-4o-mini
+
+# Validate a specific service
+cllient-registry validate --service openai
+
+# JSON output for CI/CD
+cllient-registry --format json validate
+```
+
+**Validation Levels:**
+- `schema` - YAML schema validation
+- `crossref` - Cross-reference validation (model-service links)
+- `semantic` - Semantic validation (consistent naming, pricing)
+- `live` - Live API testing
+- `all` - All levels except live (default)
+
+### `stats` - Show Registry Statistics
+
+Display registry index statistics.
+
+```bash
+cllient-registry stats
+
+# Output:
+# Registry Statistics
+# ===================
+# Services:          15
+#   Verified:        8
+#   Unverified:      7
+# Models:            330
+#   Verified:        45
+#   Unverified:      285
+# Families:          25
+# Orphan Services:   0
+# Broken References: 0
+```
+
+### `index` - Show Service-Model Mappings
+
+Display the full bidirectional index.
+
+```bash
+cllient-registry index
+
+# JSON output
+cllient-registry --format json index
+```
+
+### `orphans` - List Orphan Services
+
+Find services that have no models configured.
+
+```bash
+cllient-registry orphans
+```
+
+### `broken` - List Broken References
+
+Find models that reference non-existent services.
+
+```bash
+cllient-registry broken
+```
+
+### `models-for` - List Models for a Service
+
+Get all models that use a specific service.
+
+```bash
+cllient-registry models-for openai
+cllient-registry models-for anthropic
+cllient-registry --format json models-for deepseek
+```
+
+### `service-for` - Get Service for a Model
+
+Find which service a model uses.
+
+```bash
+cllient-registry service-for gpt-4o-mini
+cllient-registry service-for claude-3-opus-20240229
+```
+
+### `search` - Search for Models
+
+Search for models with various filters.
+
+```bash
+# Basic search
+cllient-registry search gpt
+
+# Fuzzy matching
+cllient-registry search --fuzzy claude
+
+# Filter by verified status
+cllient-registry search --verified gpt
+
+# Filter by service
+cllient-registry search --service openai gpt
+
+# Filter by family
+cllient-registry search --family claude opus
+
+# Limit results
+cllient-registry search --limit 10 gpt
+
+# Combined filters
+cllient-registry search --verified --service openai --limit 5 gpt
+```
+
+### `services` - List All Services
+
+List all services with their model counts and verification status.
+
+```bash
+cllient-registry services
+
+# Output:
+# Services (15):
+#   ✓ openai                        85 models
+#   ✓ anthropic                     24 models
+#   ? deepseek                      12 models
+```
+
+**Status indicators:**
+- `✓` - Verified
+- `?` - Unverified
+- `✗` - Broken
+- `⚠` - Deprecated
+- `!` - Error
+- `∅` - Not Found
+
+### `families` - List All Families
+
+List all model families with their model counts.
+
+```bash
+cllient-registry families
+
+# Output:
+# Families (25):
+#   gpt                              45 models
+#   claude                           24 models
+#   deepseek                         12 models
+```
+
+### `verify` - Verify Services/Models
+
+Test API connectivity to verify services and models work correctly.
+
+```bash
+# Verify a specific service
+cllient-registry verify --service openai
+
+# Verify a specific model
+cllient-registry verify --model gpt-4o-mini
+
+# Verify all unverified services
+cllient-registry verify --all-services
+
+# Verify all unverified models (for verified services)
+cllient-registry verify --all-models
+
+# Limit models tested per service
+cllient-registry verify --all-services --max-per-service 5
+
+# Dry run - show what would be tested
+cllient-registry verify --all-services --dry-run
+
+# Update config files with verification results
+cllient-registry verify --service openai --update-configs
+```
+
+---
+
+## cllient-hub - Hub Server
+
+The `cllient-hub` CLI runs a standalone hub server that exposes the ModelRegistry over JSON-RPC.
+
+> **Source Code**: [`src/bin/cllient-hub.rs`](../src/bin/cllient-hub.rs)
+
+### Installation
+
+```bash
+cargo install --path . --bin cllient-hub
+```
+
+### Usage
+
+```bash
+# Start with default settings (127.0.0.1:8080)
+cllient-hub
+
+# Bind to a specific address
+cllient-hub --bind 127.0.0.1:8080
+cllient-hub --bind 0.0.0.0:3000
+
+# Use custom config directory (not yet fully supported)
+cllient-hub --config ./my-configs
+
+# Only load verified models
+cllient-hub --verified-only
+```
+
+### Options
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--bind` | `-b` | Address to bind the server to | `127.0.0.1:8080` |
+| `--config` | `-c` | Config directory (uses embedded if not specified) | embedded |
+| `--verified-only` | | Only load verified models | false |
+
+### Startup Output
+
+```
+cllient-hub starting
+  Bind address: 127.0.0.1:8080
+  Models: 330 total, 45 verified
+  Services: 15
+
+  openai (85 models)
+  anthropic (24 models)
+  deepseek (12 models)
+  ...
+```
+
+---
+
+## cllient-utils - Utility Commands
+
+The `cllient-utils` CLI provides utility commands for testing and debugging.
+
+> **Source Code**: [`src/bin/cllient-utils.rs`](../src/bin/cllient-utils.rs)
+
+### Installation
+
+```bash
+cargo install --path . --bin cllient-utils
+```
+
+### `test-family` - Test All Models in a Family
+
+Test all models belonging to a specific family.
+
+```bash
+# Test all models in a family
+cllient-utils test-family claude
+cllient-utils test-family gpt
+cllient-utils test-family deepseek
+
+# Test and update config files with status
+cllient-utils test-family claude --update-status
+```
+
+**Features:**
+- Runs tests in parallel (up to 5 concurrent requests)
+- Tests each model with a simple "respond with just hi" prompt
+- Reports success/failure status for each model
+- Optionally updates model config files with verification status
+
+**Status values when using `--update-status`:**
+- `verified` - Model responded successfully
+- `auth_error` - Authentication failure
+- `not_found` - Model not found or deprecated
+- `access_restricted` - Organization verification required
+- `special_requirements` - Model requires special input (e.g., audio)
+- `endpoint_error` - Unsupported parameter or endpoint issue
+- `error` - General error
+
+### `debug-families` - Show Available Families
+
+Debug command to show all available model families and their models.
+
+```bash
+cllient-utils debug-families
+
+# Output:
+# Available families:
+#   - gpt
+#     Models (45): ["gpt-4o", "gpt-4o-mini", ...]
+#   - claude
+#     Models (24): ["claude-3-opus-20240229", ...]
+#
+# Looking for claude models:
+# Claude family models: ["claude-3-opus-20240229", ...]
+#
+# All models (first 10):
+#   1: gpt-4o (family: gpt)
+#   2: gpt-4o-mini (family: gpt)
+#   ...
 ```
 
 ---

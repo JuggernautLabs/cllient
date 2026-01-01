@@ -29,6 +29,32 @@ make help
 
 > **Build Configuration**: [`Cargo.toml`](../Cargo.toml)
 
+### Feature Flags
+
+The library uses Cargo features to enable optional functionality:
+
+| Feature | Description | Dependencies |
+|---------|-------------|--------------|
+| `default` | No optional features enabled | - |
+| `plugin` | Enable plugin system for substrate integration | `hub-core`, `hub-macro`, `uuid`, `jsonrpsee` |
+| `hub` | Full hub server support (includes `plugin`) | Same as `plugin` |
+
+**Building with features:**
+
+```bash
+# Default build (no optional features)
+cargo build
+
+# Build with plugin support
+cargo build --features plugin
+
+# Build with full hub support
+cargo build --features hub
+
+# Build the hub binary (requires hub feature)
+cargo build --bin cllient-hub --features hub
+```
+
 ### Basic Commands
 
 ```bash
@@ -92,6 +118,11 @@ cargo test --test low_level_client_tests
 
 # All tests
 make test
+
+# Tests with feature flags
+cargo test --features plugin
+cargo test --features hub
+cargo test --all-features
 ```
 
 ### Provider Testing
@@ -235,6 +266,21 @@ make test-provider PROVIDER=newprovider
 ## Code Quality
 
 > **Linting**: [`src/`](../src/) | **Formatting**: [rustfmt](https://github.com/rust-lang/rustfmt)
+
+### Recent Improvements
+
+The codebase has undergone significant refactoring to improve quality and performance:
+
+**Eliminated Redundancy:**
+- Replaced duplicate trait implementations with declarative macros
+- Consolidated duplicate SSE extractor/provider files into generic config-driven implementations
+- Removed approximately 230 net lines while adding functionality
+
+**Performance Improvements:**
+- Static regex compilation using `OnceLock` instead of repeated `Regex::new()` calls
+- Index-based lookups instead of O(n) iterations for model/family queries
+- Pre-allocated HashMap capacity and `Entry` API usage in registry indexing
+- Consuming `into_*` methods to avoid unnecessary cloning
 
 ### Code Formatting
 

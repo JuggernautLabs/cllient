@@ -112,7 +112,7 @@ http:
   request: |
     POST /v1/chat/completions HTTP/1.1
     Authorization: Bearer ${OPENAI_API_KEY}
-    
+
     {
       "model": "{{model_id}}",
       "messages": {{json messages}},
@@ -124,6 +124,7 @@ http:
 - **Variable Substitution**: `${ENV_VAR}` and `{{template_var}}`
 - **JSON Helpers**: `{{json data}}` for proper serialization
 - **HTTP Transparency**: See exact requests being sent
+- **Static Regex Patterns**: Uses `OnceLock` for compile-once regex patterns, avoiding repeated compilation overhead
 
 ### 5. Streaming Infrastructure
 
@@ -133,14 +134,15 @@ Real-time response processing via Server-Sent Events (SSE):
 
 ```
 Streaming Pipeline:
-Raw SSE → Provider Parser → Content Extractor → StreamChunk
+Raw SSE → Generic Config-Driven Parser → Content Extractor → StreamChunk
 ```
 
 **Components**:
 - **[SSE Core](../src/streaming/sse/core/)** - Generic SSE processing
-- **[Provider Parsers](../src/streaming/sse/providers/)** - OpenAI, Anthropic, etc.
-- **[Content Extractors](../src/streaming/sse/extractors/)** - Extract text from responses
+- **[Generic SSE Handlers](../src/streaming/sse/)** - Config-driven provider/extractor system (consolidated from provider-specific implementations)
 - **[JSON Utils](../src/streaming/json_utils.rs)** - JSON path extraction
+
+> **Note**: SSE extractors and providers have been consolidated into a generic, config-driven system. Provider-specific files (e.g., `claude.rs`, `openai.rs`) were removed in favor of unified implementations that use configuration to handle different provider formats.
 
 ### 6. Streaming JSON Output System
 
@@ -371,29 +373,30 @@ HTTP Response Stream
     └─ StreamChunk::Error(error)
 ```
 
-### Provider-Specific Parsers
+### Generic Config-Driven SSE Parsing
 
-> **Implementation**: [`src/streaming/sse/providers/`](../src/streaming/sse/providers/)
+> **Implementation**: [`src/streaming/sse/`](../src/streaming/sse/)
 
-Each provider has custom SSE parsing:
+SSE parsing is now handled by a generic, configuration-driven system. Instead of separate parser files per provider, JSON path extraction is defined in service configurations:
 
-**OpenAI/DeepSeek Parser**:
-```rust
-// Parse: data: {"choices":[{"delta":{"content":"hello"}}]}
-let content = json["choices"][0]["delta"]["content"].as_str()?;
+**Service Config Example**:
+```yaml
+streaming:
+  format: text/event-stream
+  content_path: choices[0].delta.content  # OpenAI format
+  # or: delta.text                         # Anthropic format
+  # or: candidates[0].content.parts[0].text  # Google format
 ```
 
-**Anthropic Parser**:
-```rust  
-// Parse: data: {"delta":{"text":"hello"}}
-let content = json["delta"]["text"].as_str()?;
-```
+**Supported Provider Formats**:
 
-**Google Parser**:
-```rust
-// Parse: data: {"candidates":[{"content":{"parts":[{"text":"hello"}]}}]}
-let content = json["candidates"][0]["content"]["parts"][0]["text"].as_str()?;
-```
+| Provider | Content JSON Path |
+|----------|------------------|
+| OpenAI/DeepSeek | `choices[0].delta.content` |
+| Anthropic | `delta.text` |
+| Google | `candidates[0].content.parts[0].text` |
+
+This approach eliminates duplicate provider-specific code while maintaining full compatibility with all supported LLM APIs.
 
 ---
 
@@ -536,6 +539,25 @@ trait MessageBuilder {
 - **Header Validation**: Proper authorization headers
 - **Request Signing**: Provider-specific authentication
 - **Error Sanitization**: No secrets in error messages
+
+---
+
+## Recent Refactoring
+
+### Commit c0ef5a1 - Code Quality and Performance Improvements
+
+A major refactoring effort focused on eliminating redundancy, improving performance, and enhancing code quality.
+
+**Key Changes**:
+
+- **SSE Consolidation**: Provider-specific extractor and parser files (`claude.rs`, `openai.rs` in `extractors/` and `providers/`) were deleted in favor of a generic, config-driven implementation
+- **Static Regex Patterns**: `template.rs` now uses `OnceLock` for compile-once regex patterns instead of repeated `Regex::new()` calls
+- **Macro-Based Trait Implementations**: Duplicate `ConfigProvider` trait implementations replaced with declarative macros
+- **Performance Optimizations**: Index-based lookups in `runtime.rs`, Entry API usage in `registry_index.rs`, consuming `into_*` methods in `export.rs`
+
+**Stats**: ~230 net lines removed, 4 duplicate files deleted, 20 files changed.
+
+For detailed architecture decisions and future plans, see the [architecture documentation](architecture/).
 
 ---
 

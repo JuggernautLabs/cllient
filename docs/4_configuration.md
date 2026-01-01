@@ -73,7 +73,7 @@ cllient ask deepseek-chat "Hello!" && echo "✅ DeepSeek working"
 cllient uses a **layered configuration system** where settings override in this order:
 
 ```
-1. Embedded configs (330+ models built into binary)
+1. Embedded configs (339 models across 57 families and 9 providers built into binary)
 2. External configs (custom YAML files)  
 3. Environment variables (API keys, runtime settings)
 ```
