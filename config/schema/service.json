@@ -1,0 +1,444 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cllient.dev/schemas/service.json",
+  "title": "Service Configuration Schema",
+  "description": "Config-driven schema for LLM service configurations that eliminates provider-specific Rust code",
+  "type": "object",
+  "required": ["service", "http", "response", "message_format"],
+  "additionalProperties": false,
+  "properties": {
+    "service": {
+      "type": "object",
+      "description": "Service metadata and identification",
+      "required": ["name", "base_url"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable name of the service provider"
+        },
+        "base_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Base URL for API requests"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["verified", "experimental", "deprecated"],
+          "default": "experimental",
+          "description": "Integration status of this service"
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of the service"
+        },
+        "documentation_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Link to official API documentation"
+        }
+      }
+    },
+
+    "http": {
+      "type": "object",
+      "description": "HTTP request template configuration",
+      "required": ["request"],
+      "additionalProperties": false,
+      "properties": {
+        "request": {
+          "type": "string",
+          "description": "HTTP request template using Handlebars syntax. Includes method, path, headers, and body."
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 600000,
+          "default": 30000,
+          "description": "Request timeout in milliseconds"
+        },
+        "retry": {
+          "type": "object",
+          "description": "Retry configuration for failed requests",
+          "additionalProperties": false,
+          "properties": {
+            "max_attempts": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 3
+            },
+            "initial_delay_ms": {
+              "type": "integer",
+              "minimum": 100,
+              "default": 1000
+            },
+            "backoff_multiplier": {
+              "type": "number",
+              "minimum": 1,
+              "default": 2
+            },
+            "retry_codes": {
+              "type": "array",
+              "items": { "type": "integer" },
+              "default": [429, 500, 502, 503, 504],
+              "description": "HTTP status codes that trigger a retry"
+            }
+          }
+        }
+      }
+    },
+
+    "optional": {
+      "type": "object",
+      "description": "Optional request body fields that are conditionally injected",
+      "additionalProperties": {
+        "type": "string",
+        "description": "Template fragment to inject when the feature is enabled"
+      }
+    },
+
+    "message_format": {
+      "type": "object",
+      "description": "Defines how to build messages from internal representation to provider format",
+      "required": ["message"],
+      "additionalProperties": false,
+      "properties": {
+        "roles": {
+          "type": "object",
+          "description": "Role name mappings from internal to provider format",
+          "additionalProperties": false,
+          "properties": {
+            "user": { "type": "string", "default": "user" },
+            "assistant": { "type": "string", "default": "assistant" },
+            "system": { "type": "string", "default": "system" },
+            "tool": { "type": "string", "default": "tool" }
+          }
+        },
+        "system_handling": {
+          "type": "string",
+          "enum": ["inline", "separate", "first_user_prefix"],
+          "default": "inline",
+          "description": "How to handle system messages: inline=as regular message, separate=top-level parameter, first_user_prefix=prepend to first user message"
+        },
+        "blocks": {
+          "type": "object",
+          "description": "Templates for content block types",
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "Template for text content blocks. Variables: {{value}}"
+            },
+            "image": {
+              "type": "object",
+              "description": "Templates for image content by MIME type",
+              "additionalProperties": {
+                "type": "string",
+                "description": "Template for specific image MIME type. Variables: {{media_type}}, {{data}}, {{url}}"
+              }
+            },
+            "audio": {
+              "type": "object",
+              "description": "Templates for audio content by MIME type",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "document": {
+              "type": "object",
+              "description": "Templates for document content by MIME type",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "tool_use": {
+              "type": "string",
+              "description": "Template for tool use/function call blocks. Variables: {{id}}, {{name}}, {{input}}"
+            },
+            "tool_result": {
+              "type": "string",
+              "description": "Template for tool result blocks. Variables: {{tool_use_id}}, {{content}}, {{is_error}}"
+            }
+          }
+        },
+        "message": {
+          "type": "string",
+          "description": "Template for a complete message. Variables: {{role}}, {{content}}, {{blocks}}"
+        },
+        "content_array": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether content is always an array of blocks, or can be a plain string for single text"
+        },
+        "string_shorthand": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, single text blocks can be serialized as plain string instead of array"
+        }
+      }
+    },
+
+    "streaming": {
+      "type": "object",
+      "description": "Server-Sent Events streaming configuration",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": ["text/event-stream", "ndjson", "chunked"],
+          "default": "text/event-stream",
+          "description": "Stream format type"
+        },
+        "line_prefix": {
+          "type": "string",
+          "description": "Prefix that data lines must have (e.g., 'data: ')"
+        },
+        "event_type_prefix": {
+          "type": "string",
+          "default": "event: ",
+          "description": "Prefix for event type lines"
+        },
+        "token_path": {
+          "type": "string",
+          "description": "JSONPath expression to extract tokens from events (e.g., 'delta.text', 'choices[0].delta.content')"
+        },
+        "end_conditions": {
+          "type": "array",
+          "description": "Conditions that signal the end of the stream",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "field": {
+                "type": "string",
+                "description": "JSONPath to the field to check"
+              },
+              "equals": {
+                "description": "Value that signals stream end"
+              },
+              "exists": {
+                "type": "boolean",
+                "description": "End when field exists (true) or is absent (false)"
+              },
+              "not_null": {
+                "type": "boolean",
+                "description": "End when field is non-null"
+              },
+              "raw_line": {
+                "type": "string",
+                "description": "End when raw line matches this exact string"
+              }
+            }
+          }
+        },
+        "events": {
+          "type": "array",
+          "description": "Event type handlers for structured SSE",
+          "items": {
+            "type": "object",
+            "required": ["action"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Event type to match (from 'event:' line)"
+              },
+              "extract": {
+                "type": "string",
+                "description": "JSONPath to extract from event data"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["start", "content", "content_start", "content_stop", "role_start", "usage_update", "finish", "stop", "error", "function_call", "tool_call", "raw"],
+                "description": "Action to perform when event matches"
+              },
+              "filter": {
+                "type": "string",
+                "description": "JSONPath expression - event only processed if this path exists and is non-null"
+              }
+            }
+          }
+        },
+        "usage_paths": {
+          "type": "object",
+          "description": "JSONPaths to extract usage data from streaming events",
+          "additionalProperties": false,
+          "properties": {
+            "input_tokens": { "type": "string" },
+            "output_tokens": { "type": "string" },
+            "total_tokens": { "type": "string" },
+            "cache_read_tokens": { "type": "string" },
+            "cache_write_tokens": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "response": {
+      "type": "object",
+      "description": "Response parsing configuration",
+      "required": ["extract"],
+      "additionalProperties": false,
+      "properties": {
+        "success_codes": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "default": [200],
+          "description": "HTTP status codes indicating success"
+        },
+        "extract": {
+          "type": "object",
+          "description": "JSONPath expressions to extract response fields",
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "Path to response content (e.g., 'content[0].text', 'choices[0].message.content')"
+            },
+            "role": {
+              "type": "string",
+              "description": "Path to response role"
+            },
+            "finish_reason": {
+              "type": "string",
+              "description": "Path to finish/stop reason"
+            },
+            "message_id": {
+              "type": "string",
+              "description": "Path to message ID"
+            },
+            "model": {
+              "type": "string",
+              "description": "Path to model name used"
+            },
+            "usage": {
+              "type": "object",
+              "description": "Paths to usage statistics",
+              "additionalProperties": false,
+              "properties": {
+                "input": { "type": "string" },
+                "output": { "type": "string" },
+                "total": { "type": "string" },
+                "cache_read": { "type": "string" },
+                "cache_creation": { "type": "string" }
+              }
+            },
+            "tool_calls": {
+              "type": "string",
+              "description": "Path to tool call array"
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "JSONPaths to extract error information",
+          "additionalProperties": false,
+          "properties": {
+            "message": { "type": "string" },
+            "type": { "type": "string" },
+            "code": { "type": "string" },
+            "param": { "type": "string" },
+            "status": { "type": "string" }
+          }
+        },
+        "transforms": {
+          "type": "object",
+          "description": "Post-extraction value transformations",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "map": {
+                "type": "object",
+                "description": "Map extracted values to normalized values",
+                "additionalProperties": { "type": "string" }
+              },
+              "default": {
+                "description": "Default value if extraction fails"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "rate_limits": {
+      "type": "object",
+      "description": "Rate limiting configuration",
+      "additionalProperties": false,
+      "properties": {
+        "requests_per_minute": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum requests per minute"
+        },
+        "tokens_per_minute": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum tokens per minute"
+        },
+        "concurrent_requests": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum concurrent requests"
+        },
+        "requests_per_day": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum requests per day"
+        },
+        "images_per_minute": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum image requests per minute"
+        }
+      }
+    },
+
+    "authentication": {
+      "type": "object",
+      "description": "Authentication configuration (for documentation, actual values come from env vars)",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["api_key", "bearer", "oauth2", "custom"],
+          "description": "Authentication type"
+        },
+        "env_var": {
+          "type": "string",
+          "description": "Environment variable containing the API key"
+        },
+        "header": {
+          "type": "string",
+          "description": "Header name for API key authentication"
+        },
+        "prefix": {
+          "type": "string",
+          "description": "Prefix for the auth value (e.g., 'Bearer ')"
+        }
+      }
+    },
+
+    "extensions": {
+      "type": "object",
+      "description": "Provider-specific extensions that don't fit the standard schema",
+      "additionalProperties": true,
+      "properties": {
+        "azure": {
+          "type": "object",
+          "description": "Azure-specific configuration",
+          "properties": {
+            "endpoint_env_var": { "type": "string" },
+            "deployment_mapping": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            },
+            "api_version": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

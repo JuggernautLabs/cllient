@@ -1,0 +1,180 @@
+# Google Gemini API - Config-Driven v2 Schema
+# Demonstrates handling of significantly different message format
+
+service:
+  name: Google
+  base_url: https://generativelanguage.googleapis.com
+  status: verified
+  description: Google Gemini models via Generative Language API
+  documentation_url: https://ai.google.dev/api/rest
+
+http:
+  request: |
+    POST /v1beta/models/{{model_id}}:{{#if stream}}streamGenerateContent{{else}}generateContent{{/if}} HTTP/1.1
+    Host: generativelanguage.googleapis.com
+    Content-Type: application/json
+    x-goog-api-key: ${GOOGLE_API_KEY}
+
+    {
+      "contents": {{messages}},
+      {{#if system}}"systemInstruction": {"parts": [{"text": {{json system}}}]},{{/if}}
+      "generationConfig": {
+        "temperature": {{temperature}},
+        "maxOutputTokens": {{max_tokens}},
+        "topP": {{top_p}}
+      },
+      "safetySettings": [
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+      ]
+    }
+  timeout_ms: 60000
+  retry:
+    max_attempts: 3
+    initial_delay_ms: 1000
+    backoff_multiplier: 2
+    retry_codes: [429, 500, 503]
+
+optional:
+  top_k: |
+    ,
+    "generationConfig": {"topK": {{top_k}}}
+  stop_sequences: |
+    ,
+    "generationConfig": {"stopSequences": {{json stop_sequences}}}
+  tools: |
+    ,
+    "tools": [{"functionDeclarations": {{json tools}}}]
+  response_mime_type: |
+    ,
+    "generationConfig": {"responseMimeType": {{json response_mime_type}}}
+  response_schema: |
+    ,
+    "generationConfig": {"responseSchema": {{json response_schema}}}
+
+# Message format definition - replaces hardcoded `message_builder: google`
+# Google uses "contents" with "parts" structure
+message_format:
+  roles:
+    user: user
+    assistant: model  # Google uses "model" instead of "assistant"
+    # System is handled via systemInstruction
+
+  system_handling: separate  # System message goes to "systemInstruction"
+
+  blocks:
+    # Text content part
+    text: '{"text": {{json value}}}'
+
+    # Image content parts - Google uses "inlineData"
+    image:
+      "image/jpeg": '{"inlineData": {"mimeType": "image/jpeg", "data": {{json data}}}}'
+      "image/png": '{"inlineData": {"mimeType": "image/png", "data": {{json data}}}}'
+      "image/gif": '{"inlineData": {"mimeType": "image/gif", "data": {{json data}}}}'
+      "image/webp": '{"inlineData": {"mimeType": "image/webp", "data": {{json data}}}}'
+
+    # Document parts (PDFs)
+    document:
+      "application/pdf": '{"inlineData": {"mimeType": "application/pdf", "data": {{json data}}}}'
+
+    # Video parts
+    video:
+      "video/mp4": '{"inlineData": {"mimeType": "video/mp4", "data": {{json data}}}}'
+
+    # Audio parts
+    audio:
+      "audio/wav": '{"inlineData": {"mimeType": "audio/wav", "data": {{json data}}}}'
+      "audio/mp3": '{"inlineData": {"mimeType": "audio/mpeg", "data": {{json data}}}}'
+
+    # Function call (in model response)
+    tool_use: '{"functionCall": {"name": {{json name}}, "args": {{input}}}}'
+
+    # Function response (user message)
+    tool_result: '{"functionResponse": {"name": {{json name}}, "response": {"content": {{json content}}}}}'
+
+  # Complete message template - Google uses "contents" with "parts"
+  message: '{"role": {{json role}}, "parts": {{blocks}}}'
+
+  content_array: true  # Parts is always an array
+  string_shorthand: false  # Google doesn't support string shorthand
+
+# Streaming configuration - replaces hardcoded `parser: google_sse`
+streaming:
+  format: text/event-stream
+  line_prefix: "data: "
+
+  # Primary token extraction path
+  token_path: candidates[0].content.parts[0].text
+
+  # Stream end conditions
+  end_conditions:
+    - field: candidates[0].finishReason
+      not_null: true
+    - field: error
+      exists: true
+
+  # Event handlers
+  events:
+    - extract: candidates[0].content.parts[0].text
+      action: content
+      filter: candidates[0].content.parts[0].text
+
+    - extract: candidates[0].content.parts[0].functionCall
+      action: tool_call
+      filter: candidates[0].content.parts[0].functionCall
+
+    - extract: candidates[0].finishReason
+      action: finish
+      filter: candidates[0].finishReason
+
+    - extract: usageMetadata
+      action: usage_update
+      filter: usageMetadata
+
+    - extract: error
+      action: error
+      filter: error
+
+  usage_paths:
+    input_tokens: usageMetadata.promptTokenCount
+    output_tokens: usageMetadata.candidatesTokenCount
+    total_tokens: usageMetadata.totalTokenCount
+
+response:
+  success_codes: [200]
+  extract:
+    content: candidates[0].content.parts[0].text
+    role: candidates[0].content.role
+    finish_reason: candidates[0].finishReason
+    usage:
+      input: usageMetadata.promptTokenCount
+      output: usageMetadata.candidatesTokenCount
+      total: usageMetadata.totalTokenCount
+    tool_calls: candidates[0].content.parts[?(@.functionCall)]
+  error:
+    message: error.message
+    type: error.code
+    code: error.status
+  transforms:
+    finish_reason:
+      map:
+        STOP: stop
+        MAX_TOKENS: length
+        SAFETY: content_filter
+        RECITATION: content_filter
+        OTHER: other
+    role:
+      map:
+        model: assistant
+
+rate_limits:
+  requests_per_minute: 60
+  tokens_per_minute: 32000
+  concurrent_requests: 5
+
+authentication:
+  type: api_key
+  env_var: GOOGLE_API_KEY
+  header: x-goog-api-key

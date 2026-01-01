@@ -1,0 +1,179 @@
+# Anthropic Claude API - Config-Driven v2 Schema
+# This config eliminates all provider-specific Rust code requirements
+
+service:
+  name: Anthropic
+  base_url: https://api.anthropic.com
+  status: verified
+  description: Anthropic Claude API - all Claude models
+  documentation_url: https://docs.anthropic.com/en/api
+
+http:
+  request: |
+    POST /v1/messages HTTP/1.1
+    Host: api.anthropic.com
+    Content-Type: application/json
+    anthropic-version: 2023-06-01
+    x-api-key: ${ANTHROPIC_API_KEY}
+
+    {
+      "model": "{{model_id}}",
+      "messages": {{messages}},
+      {{#if system}}"system": {{json system}},{{/if}}
+      "max_tokens": {{max_tokens}},
+      "temperature": {{temperature}},
+      "stream": {{stream}}
+    }
+  timeout_ms: 60000
+  retry:
+    max_attempts: 3
+    initial_delay_ms: 1000
+    backoff_multiplier: 2
+    retry_codes: [429, 500, 529]
+
+optional:
+  top_p: |
+    ,
+    "top_p": {{top_p}}
+  top_k: |
+    ,
+    "top_k": {{top_k}}
+  stop_sequences: |
+    ,
+    "stop_sequences": {{json stop_sequences}}
+  tools: |
+    ,
+    "tools": {{json tools}},
+    "tool_choice": {{json tool_choice}}
+  metadata: |
+    ,
+    "metadata": {{json metadata}}
+
+# Message format definition - replaces hardcoded `message_builder: anthropic`
+message_format:
+  roles:
+    user: user
+    assistant: assistant
+    # Anthropic handles system separately, not as a role
+
+  system_handling: separate  # System message goes to top-level "system" parameter
+
+  blocks:
+    # Text content block
+    text: '{"type": "text", "text": {{json value}}}'
+
+    # Image content blocks by MIME type
+    image:
+      "image/jpeg": '{"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": {{json data}}}}'
+      "image/png": '{"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": {{json data}}}}'
+      "image/gif": '{"type": "image", "source": {"type": "base64", "media_type": "image/gif", "data": {{json data}}}}'
+      "image/webp": '{"type": "image", "source": {"type": "base64", "media_type": "image/webp", "data": {{json data}}}}'
+      "url": '{"type": "image", "source": {"type": "url", "url": {{json url}}}}'
+
+    # Document content blocks (PDFs)
+    document:
+      "application/pdf": '{"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": {{json data}}}}'
+
+    # Tool use block (assistant's function call)
+    tool_use: '{"type": "tool_use", "id": {{json id}}, "name": {{json name}}, "input": {{input}}}'
+
+    # Tool result block (user's response to tool call)
+    tool_result: '{"type": "tool_result", "tool_use_id": {{json tool_use_id}}, "content": {{json content}}{{#if is_error}}, "is_error": true{{/if}}}'
+
+  # Complete message template
+  message: '{"role": {{json role}}, "content": {{blocks}}}'
+
+  content_array: true  # Content is always an array in Anthropic format
+  string_shorthand: false  # Anthropic doesn't support string shorthand for content
+
+# Streaming configuration - replaces hardcoded `parser: anthropic_sse`
+streaming:
+  format: text/event-stream
+  event_type_prefix: "event: "
+
+  # Primary token extraction path
+  token_path: delta.text
+
+  # Stream end conditions
+  end_conditions:
+    - field: type
+      equals: message_stop
+    - field: error
+      exists: true
+
+  # Event handlers
+  events:
+    - type: message_start
+      extract: message
+      action: start
+
+    - type: content_block_start
+      extract: content_block
+      action: content_start
+
+    - type: content_block_delta
+      extract: delta.text
+      action: content
+      filter: delta.text
+
+    - type: content_block_delta
+      extract: delta.partial_json
+      action: tool_call
+      filter: delta.partial_json
+
+    - type: content_block_stop
+      action: content_stop
+
+    - type: message_delta
+      extract: delta
+      action: usage_update
+
+    - type: message_stop
+      action: stop
+
+    - type: error
+      extract: error
+      action: error
+
+  # Usage extraction paths for streaming
+  usage_paths:
+    input_tokens: message.usage.input_tokens
+    output_tokens: usage.output_tokens
+    cache_read_tokens: message.usage.cache_read_input_tokens
+    cache_write_tokens: message.usage.cache_creation_input_tokens
+
+response:
+  success_codes: [200]
+  extract:
+    content: content[0].text
+    role: role
+    finish_reason: stop_reason
+    message_id: id
+    model: model
+    usage:
+      input: usage.input_tokens
+      output: usage.output_tokens
+      cache_read: usage.cache_read_input_tokens
+      cache_creation: usage.cache_creation_input_tokens
+    tool_calls: content[?(@.type=="tool_use")]
+  error:
+    message: error.message
+    type: error.type
+    code: error.code
+  transforms:
+    finish_reason:
+      map:
+        end_turn: stop
+        max_tokens: length
+        stop_sequence: stop
+        tool_use: tool_calls
+
+rate_limits:
+  requests_per_minute: 50
+  tokens_per_minute: 40000
+  concurrent_requests: 5
+
+authentication:
+  type: api_key
+  env_var: ANTHROPIC_API_KEY
+  header: x-api-key

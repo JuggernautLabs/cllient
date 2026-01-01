@@ -13,6 +13,7 @@ pub mod export;
 pub mod registry_index;
 pub mod validation;
 pub mod query;
+pub mod message_format;
 
 #[cfg(feature = "plugin")]
 pub mod events;
@@ -28,6 +29,11 @@ pub use embedded_config::EmbeddedConfigLoader;
 pub use registry_index::{RegistryIndex, IndexStats, BrokenReference};
 pub use validation::{ValidationLevel, ValidationReport, ValidationIssue, Severity, ConfigValidator};
 pub use query::{ModelQuery, Filter, CapabilityFilter, OrderBy};
+pub use message_format::{
+    MessageFormatConfig, MessageFormatter, MessageFormatBuilder, MessageFormatRegistry,
+    ContentBlockConfig, ContentBlockType, MessageTemplate,
+    anthropic_format, openai_format,
+};
 pub use client::{
     LowLevelClient, HttpClient, ClientFactory, ConfigProvider,
     FileBasedClientFactory, EmbeddedClientFactory

@@ -1,0 +1,196 @@
+# OpenAI API - Config-Driven v2 Schema
+# This config eliminates all provider-specific Rust code requirements
+
+service:
+  name: OpenAI
+  base_url: https://api.openai.com
+  status: verified
+  description: OpenAI GPT models including GPT-4, GPT-4o, and o1 series
+  documentation_url: https://platform.openai.com/docs/api-reference
+
+http:
+  request: |
+    POST /v1/chat/completions HTTP/1.1
+    Host: api.openai.com
+    Content-Type: application/json
+    Authorization: Bearer ${OPENAI_API_KEY}
+
+    {
+      "model": "{{model_id}}",
+      "messages": {{messages}},
+      "temperature": {{temperature}},
+      "max_tokens": {{max_tokens}},
+      "stream": {{stream}}
+    }
+  timeout_ms: 60000
+  retry:
+    max_attempts: 3
+    initial_delay_ms: 1000
+    backoff_multiplier: 2
+    retry_codes: [429, 500, 502, 503]
+
+optional:
+  json_mode: |
+    ,
+    "response_format": {"type": "json_object"}
+  json_schema: |
+    ,
+    "response_format": {"type": "json_schema", "json_schema": {{json json_schema}}}
+  tools: |
+    ,
+    "tools": {{json tools}},
+    "tool_choice": {{json tool_choice}}
+  top_p: |
+    ,
+    "top_p": {{top_p}}
+  frequency_penalty: |
+    ,
+    "frequency_penalty": {{frequency_penalty}}
+  presence_penalty: |
+    ,
+    "presence_penalty": {{presence_penalty}}
+  stop: |
+    ,
+    "stop": {{json stop}}
+  logprobs: |
+    ,
+    "logprobs": true,
+    "top_logprobs": {{top_logprobs}}
+  seed: |
+    ,
+    "seed": {{seed}}
+  user: |
+    ,
+    "user": {{json user}}
+  stream_options: |
+    ,
+    "stream_options": {"include_usage": true}
+
+# Message format definition - replaces hardcoded `message_builder: openai`
+message_format:
+  roles:
+    user: user
+    assistant: assistant
+    system: system
+    tool: tool
+
+  system_handling: inline  # System messages are regular messages with role "system"
+
+  blocks:
+    # Text content block
+    text: '{"type": "text", "text": {{json value}}}'
+
+    # Image content blocks
+    image:
+      "image/jpeg": '{"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,{{data}}"}}'
+      "image/png": '{"type": "image_url", "image_url": {"url": "data:image/png;base64,{{data}}"}}'
+      "image/gif": '{"type": "image_url", "image_url": {"url": "data:image/gif;base64,{{data}}"}}'
+      "image/webp": '{"type": "image_url", "image_url": {"url": "data:image/webp;base64,{{data}}"}}'
+      "url": '{"type": "image_url", "image_url": {"url": {{json url}}, "detail": {{json detail}}}}'
+
+    # Audio content blocks (for GPT-4o audio)
+    audio:
+      "audio/wav": '{"type": "input_audio", "input_audio": {"data": {{json data}}, "format": "wav"}}'
+      "audio/mp3": '{"type": "input_audio", "input_audio": {"data": {{json data}}, "format": "mp3"}}'
+
+    # Tool call in assistant message
+    tool_use: |
+      {
+        "id": {{json id}},
+        "type": "function",
+        "function": {
+          "name": {{json name}},
+          "arguments": {{json input}}
+        }
+      }
+
+    # Tool result message (note: OpenAI uses a separate message, not a content block)
+    tool_result: '{"role": "tool", "tool_call_id": {{json tool_use_id}}, "content": {{json content}}}'
+
+  # Complete message template
+  message: '{"role": {{json role}}, "content": {{content}}}'
+
+  content_array: true  # Content can be an array for multimodal
+  string_shorthand: true  # OpenAI accepts plain string for text-only content
+
+  # Special handling for assistant messages with tool calls
+  assistant_with_tools: '{"role": "assistant", "content": {{content}}, "tool_calls": {{tool_calls}}}'
+
+# Streaming configuration - replaces hardcoded `parser: openai_sse`
+streaming:
+  format: text/event-stream
+  line_prefix: "data: "
+
+  # Primary token extraction path
+  token_path: choices[0].delta.content
+
+  # Stream end conditions
+  end_conditions:
+    - raw_line: "[DONE]"
+    - field: choices[0].finish_reason
+      not_null: true
+
+  # Event handlers (OpenAI uses single event type with different content)
+  events:
+    - extract: choices[0].delta.content
+      action: content
+      filter: choices[0].delta.content
+
+    - extract: choices[0].delta.role
+      action: role_start
+      filter: choices[0].delta.role
+
+    - extract: choices[0].finish_reason
+      action: finish
+      filter: choices[0].finish_reason
+
+    - extract: choices[0].delta.tool_calls
+      action: tool_call
+      filter: choices[0].delta.tool_calls
+
+    - extract: usage
+      action: usage_update
+      filter: usage
+
+  # Usage extraction paths for streaming (with stream_options.include_usage=true)
+  usage_paths:
+    input_tokens: usage.prompt_tokens
+    output_tokens: usage.completion_tokens
+    total_tokens: usage.total_tokens
+
+response:
+  success_codes: [200]
+  extract:
+    content: choices[0].message.content
+    role: choices[0].message.role
+    finish_reason: choices[0].finish_reason
+    message_id: id
+    model: model
+    usage:
+      input: usage.prompt_tokens
+      output: usage.completion_tokens
+      total: usage.total_tokens
+    tool_calls: choices[0].message.tool_calls
+  error:
+    message: error.message
+    type: error.type
+    code: error.code
+    param: error.param
+  transforms:
+    finish_reason:
+      map:
+        stop: stop
+        length: length
+        tool_calls: tool_calls
+        content_filter: content_filter
+
+rate_limits:
+  requests_per_minute: 500
+  tokens_per_minute: 10000
+  concurrent_requests: 10
+
+authentication:
+  type: bearer
+  env_var: OPENAI_API_KEY
+  header: Authorization
+  prefix: "Bearer "
