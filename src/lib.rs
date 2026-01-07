@@ -32,7 +32,7 @@ pub use query::{ModelQuery, Filter, CapabilityFilter, OrderBy};
 pub use message_format::{
     MessageFormatConfig, MessageFormatter, MessageFormatBuilder, MessageFormatRegistry,
     ContentBlockConfig, ContentBlockType, MessageTemplate,
-    anthropic_format, openai_format,
+    anthropic_format, openai_format, upgrade_v1_to_v2, has_v2_upgrade,
 };
 pub use client::{
     LowLevelClient, HttpClient, ClientFactory, ConfigProvider,

@@ -87,8 +87,9 @@ fn test_nested_json_extraction() {
 async fn test_stream_processor_creation() {
     use cllient::{StreamingFormat, SseParser};
     let config = StreamingConfig {
-        format: StreamingFormat::TextEventStream,
-        parser: SseParser::OpenAiSse,
+        template: None,
+        format: Some(StreamingFormat::TextEventStream),
+        parser: Some(SseParser::OpenAiSse),
         line_prefix: Some("data: ".to_string()),
         done_marker: Some("[DONE]".to_string()),
         events: vec![],

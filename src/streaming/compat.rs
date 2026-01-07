@@ -237,15 +237,18 @@ impl StreamProcessor {
 
     pub async fn process_response(&self, response: Response) -> Result<super::Stream> {
         use crate::config::StreamingFormat;
-        match &self.config.format {
-            StreamingFormat::TextEventStream => self.process_sse_response(response).await,
-            StreamingFormat::Ndjson => Err(ClientError::Stream(
+        match self.config.format.as_ref() {
+            Some(StreamingFormat::TextEventStream) => self.process_sse_response(response).await,
+            Some(StreamingFormat::Ndjson) => Err(ClientError::Stream(
                 "NDJSON streaming not yet implemented".to_string()
             )),
-            StreamingFormat::Custom(format) => Err(ClientError::Stream(format!(
+            Some(StreamingFormat::Custom(format)) => Err(ClientError::Stream(format!(
                 "Unsupported streaming format: {}",
                 format
             ))),
+            None => Err(ClientError::Stream(
+                "Streaming format not configured".to_string()
+            )),
         }
     }
 
@@ -296,11 +299,12 @@ impl StreamProcessor {
 
     fn parse_sse_line(config: &StreamingConfig, line: &str) -> Option<StreamEvent> {
         use crate::config::SseParser;
-        match &config.parser {
-            SseParser::AnthropicSse => parse_anthropic_sse(line),
-            SseParser::OpenAiSse => parse_openai_sse(config, line),
-            SseParser::GoogleSse => parse_generic_sse(line),
-            SseParser::Custom(_) => parse_generic_sse(line),
+        match config.parser.as_ref() {
+            Some(SseParser::AnthropicSse) => parse_anthropic_sse(line),
+            Some(SseParser::OpenAiSse) => parse_openai_sse(config, line),
+            Some(SseParser::GoogleSse) => parse_generic_sse(line),
+            Some(SseParser::Custom(_)) => parse_generic_sse(line),
+            None => None, // No parser configured
         }
     }
 }

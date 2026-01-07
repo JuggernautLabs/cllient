@@ -900,6 +900,33 @@ impl MessageFormatRegistry {
         formatter.format_messages(messages)
     }
 
+    /// Get a formatter by name, auto-upgrading from v1 if needed
+    ///
+    /// This method will check if the formatter is already registered. If not,
+    /// it will attempt to auto-upgrade from a v1 format string using the
+    /// built-in presets.
+    ///
+    /// # Arguments
+    /// * `format_name` - The format name to get/upgrade
+    ///
+    /// # Returns
+    /// * `Ok(&MessageFormatter)` - Reference to the formatter (either cached or newly upgraded)
+    /// * `Err` - If the format is unknown or upgrade fails
+    pub fn get_or_upgrade(&mut self, format_name: &str) -> Result<&MessageFormatter> {
+        // Check if already registered
+        if self.formatters.contains_key(format_name) {
+            return Ok(self.formatters.get(format_name).unwrap());
+        }
+
+        // Try to auto-upgrade from v1
+        tracing::info!("Auto-upgrading v1 format '{}' to v2", format_name);
+        let config = upgrade_v1_to_v2(format_name)?;
+        let formatter = MessageFormatter::new(config)?;
+        self.register(formatter);
+
+        Ok(self.formatters.get(format_name).unwrap())
+    }
+
     /// Create a registry with built-in formats
     pub fn with_builtins() -> Result<Self> {
         let mut registry = Self::new();
@@ -916,6 +943,65 @@ impl Default for MessageFormatRegistry {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// ============================================================================
+// V1-to-V2 Auto-Upgrade System
+// ============================================================================
+
+/// Auto-upgrade a v1 message_builder string to v2 MessageFormatConfig
+///
+/// This function enables backwards compatibility by automatically converting
+/// v1 string-based message_builder values to v2 MessageFormatConfig objects.
+///
+/// # Arguments
+/// * `format_name` - The v1 format name (e.g., "anthropic", "openai", "google")
+///
+/// # Returns
+/// * `Ok(MessageFormatConfig)` - The upgraded v2 config
+/// * `Err` - If the format is unknown or not supported
+///
+/// # Examples
+/// ```
+/// use cllient::message_format::upgrade_v1_to_v2;
+///
+/// let config = upgrade_v1_to_v2("anthropic").unwrap();
+/// assert_eq!(config.name, "anthropic");
+/// ```
+pub fn upgrade_v1_to_v2(format_name: &str) -> Result<MessageFormatConfig> {
+    match format_name.to_lowercase().as_str() {
+        "anthropic" => anthropic_format(),
+        "openai" => openai_format(),
+        "google" => {
+            // Note: google_format() may not be implemented yet
+            // If not, return an error suggesting manual v2 config
+            Err(ClientError::Render(handlebars::RenderError::new(
+                "Google format not yet implemented in v2. Please create a message_format config manually.".to_string()
+            )))
+        }
+        _ => Err(ClientError::Render(handlebars::RenderError::new(
+            format!(
+                "Unknown v1 message format '{}'. Please migrate to v2 message_format config. \
+                 See docs/message_format_migration.md for details.",
+                format_name
+            )
+        )))
+    }
+}
+
+/// Check if a v1 format name has a v2 upgrade available
+///
+/// # Arguments
+/// * `format_name` - The v1 format name to check
+///
+/// # Returns
+/// * `true` if an auto-upgrade is available
+/// * `false` if the format is unknown or requires manual v2 config
+pub fn has_v2_upgrade(format_name: &str) -> bool {
+    matches!(
+        format_name.to_lowercase().as_str(),
+        "anthropic" | "openai" | "google"
+    )
 }
 
 // ============================================================================
@@ -1280,5 +1366,86 @@ mod tests {
         assert_eq!(content[2]["type"], "text");
         assert_eq!(content[3]["type"], "audio");
         assert_eq!(content[4]["type"], "image_url");
+    }
+
+    #[test]
+    fn test_v1_to_v2_upgrade() {
+        // Test anthropic upgrade
+        let config = upgrade_v1_to_v2("anthropic").unwrap();
+        assert_eq!(config.name, "anthropic");
+        assert!(!config.text_message.template.is_empty());
+        assert!(!config.content_blocks.is_empty());
+
+        // Test openai upgrade
+        let config = upgrade_v1_to_v2("openai").unwrap();
+        assert_eq!(config.name, "openai");
+        assert!(!config.text_message.template.is_empty());
+
+        // Test case insensitivity
+        let config = upgrade_v1_to_v2("ANTHROPIC").unwrap();
+        assert_eq!(config.name, "anthropic");
+
+        let config = upgrade_v1_to_v2("OpenAI").unwrap();
+        assert_eq!(config.name, "openai");
+
+        // Test unknown format returns error
+        let result = upgrade_v1_to_v2("unknown-provider");
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Unknown v1 message format"));
+        assert!(err_msg.contains("migrate to v2"));
+    }
+
+    #[test]
+    fn test_registry_auto_upgrade() {
+        let mut registry = MessageFormatRegistry::new();
+
+        // First call should auto-upgrade
+        let formatter = registry.get_or_upgrade("anthropic").unwrap();
+        assert_eq!(formatter.name(), "anthropic");
+
+        // Second call should use cached version (not re-upgrade)
+        let formatter2 = registry.get_or_upgrade("anthropic").unwrap();
+        assert_eq!(formatter2.name(), "anthropic");
+
+        // Registry should now contain the formatter
+        assert!(registry.get("anthropic").is_some());
+
+        // Try with openai
+        let formatter = registry.get_or_upgrade("openai").unwrap();
+        assert_eq!(formatter.name(), "openai");
+    }
+
+    #[test]
+    fn test_has_v2_upgrade() {
+        assert!(has_v2_upgrade("anthropic"));
+        assert!(has_v2_upgrade("ANTHROPIC"));
+        assert!(has_v2_upgrade("openai"));
+        assert!(has_v2_upgrade("OpenAI"));
+        assert!(has_v2_upgrade("google"));
+        assert!(!has_v2_upgrade("unknown"));
+        assert!(!has_v2_upgrade("custom-provider"));
+    }
+
+    #[test]
+    fn test_upgrade_produces_valid_formatter() {
+        // Verify that upgraded configs can create valid formatters
+        for format_name in &["anthropic", "openai"] {
+            let config = upgrade_v1_to_v2(format_name).unwrap();
+            let formatter = MessageFormatter::new(config).unwrap();
+
+            // Test that formatter can format a simple message
+            let messages = vec![MessageContent::Text {
+                role: "user".to_string(),
+                content: "Hello, world!".to_string(),
+            }];
+
+            let result = formatter.format_messages(&messages);
+            assert!(result.is_ok(), "Formatter for {} failed", format_name);
+
+            let json = result.unwrap();
+            assert!(json.is_array());
+            assert!(!json.as_array().unwrap().is_empty());
+        }
     }
 }

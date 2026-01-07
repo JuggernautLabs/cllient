@@ -512,6 +512,7 @@ async fn stream_clean(
             }
         }
     }
+    println!();
     Ok(())
 }
 

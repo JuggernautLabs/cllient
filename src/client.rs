@@ -5,9 +5,10 @@ use std::collections::HashMap;
 
 use crate::config::{ConfigLoader, ModelConfig, ServiceConfig};
 use crate::embedded_config::EmbeddedConfigLoader;
-use crate::error::{ClientError, Result};
+use crate::error::{ClientError, ConfigError, Result};
+use crate::message_format::MessageFormatter;
 use crate::streaming::StreamProcessor;
-use crate::template::{HttpRequest, MessageBuilder, TemplateProcessor};
+use crate::template::{HttpRequest, TemplateProcessor};
 use crate::types::{CompletionRequest, CompletionResponse, Usage};
 
 /// Trait for configuration providers (file-based or embedded)
@@ -55,6 +56,7 @@ pub struct HttpClient {
     http_client: Client,
     template_processor: TemplateProcessor,
     stream_processor: StreamProcessor,
+    message_formatter: MessageFormatter,
 }
 
 impl HttpClient {
@@ -66,13 +68,42 @@ impl HttpClient {
         let template_processor = TemplateProcessor::new();
         let stream_processor = StreamProcessor::new(&service_config.streaming)?;
 
+        // NEW: Initialize message formatter from config
+        let message_formatter = Self::create_message_formatter(&service_config)?;
+
         Ok(Self {
             model_config,
             service_config,
             http_client,
             template_processor,
             stream_processor,
+            message_formatter,
         })
+    }
+
+    /// Create a message formatter from service config (v1 or v2)
+    fn create_message_formatter(service_config: &ServiceConfig) -> Result<MessageFormatter> {
+        // Priority: v2 config first, then v1 auto-upgrade
+        if let Some(ref message_format_config) = service_config.message_format {
+            tracing::debug!(
+                "Using v2 message format config: {}",
+                message_format_config.name
+            );
+            MessageFormatter::new(message_format_config.clone())
+        } else if let Some(ref message_builder) = service_config.message_builder {
+            let format_name = message_builder.to_string();
+            tracing::warn!(
+                "Using deprecated v1 message_builder '{}', auto-upgrading to v2. \
+                 Consider migrating to message_format config.",
+                format_name
+            );
+            let upgraded_config = crate::message_format::upgrade_v1_to_v2(&format_name)?;
+            MessageFormatter::new(upgraded_config)
+        } else {
+            Err(ClientError::Config(ConfigError::MissingField(
+                "Either message_builder or message_format must be specified".to_string()
+            )))
+        }
     }
 
     pub fn from_model_id<T: ConfigProvider + ?Sized>(config_provider: &T, model_id: &str) -> Result<Self> {
@@ -89,11 +120,8 @@ impl HttpClient {
         // Model ID
         variables.insert("model_id".to_string(), Value::String(self.model_config.model.id.clone()));
 
-        // Build messages using the appropriate builder
-        let messages = MessageBuilder::build_messages(
-            &self.service_config.message_builder.to_string(),
-            &request.messages,
-        )?;
+        // Build messages using MessageFormatter (v2)
+        let messages = self.message_formatter.format_messages(&request.messages)?;
         variables.insert("messages".to_string(), messages);
 
         // System prompt (for services that use it separately like Anthropic)

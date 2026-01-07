@@ -47,7 +47,10 @@ impl EmbeddedConfigLoader {
                     .map_err(|e| ClientError::Config(ConfigError::InvalidYaml(
                         format!("Failed to parse service config '{}': {}", file_path, e)
                     )))?;
-                
+
+                // Validate message format configuration
+                service_config.validate_message_format()?;
+
                 // Extract service name from path (e.g., "service/openai.yaml" -> "openai")
                 let service_name = file_path
                     .strip_prefix("service/")
@@ -55,7 +58,7 @@ impl EmbeddedConfigLoader {
                     .ok_or_else(|| ClientError::Config(ConfigError::InvalidPath(
                         format!("Invalid service file path: {}", file_path)
                     )))?;
-                
+
                 self.services.insert(service_name.to_string(), service_config);
             }
         }

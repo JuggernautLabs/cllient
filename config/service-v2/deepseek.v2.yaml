@@ -1,19 +1,19 @@
-# OpenAI API - Config-Driven v2 Schema
-# This config eliminates all provider-specific Rust code requirements
+# DeepSeek API - Config-Driven v2 Schema
+# DeepSeek is OpenAI-compatible, using the same message and streaming formats
 
 service:
-  name: OpenAI
-  base_url: https://api.openai.com
+  name: DeepSeek
+  base_url: https://api.deepseek.com
   status: verified
-  description: OpenAI GPT models including GPT-4, GPT-4o, and o1 series
-  documentation_url: https://platform.openai.com/docs/api-reference
+  description: DeepSeek reasoning and chat models
+  documentation_url: https://platform.deepseek.com/docs
 
 http:
   request: |
     POST /v1/chat/completions HTTP/1.1
-    Host: api.openai.com
+    Host: api.deepseek.com
     Content-Type: application/json
-    Authorization: Bearer ${OPENAI_API_KEY}
+    Authorization: Bearer ${DEEPSEEK_API_KEY}
 
     {
       "model": "{{model_id}}",
@@ -30,16 +30,6 @@ http:
     retry_codes: [429, 500, 502, 503]
 
 optional:
-  json_mode: |
-    ,
-    "response_format": {"type": "json_object"}
-  json_schema: |
-    ,
-    "response_format": {"type": "json_schema", "json_schema": {{json json_schema}}}
-  tools: |
-    ,
-    "tools": {{json tools}},
-    "tool_choice": {{json tool_choice}}
   top_p: |
     ,
     "top_p": {{top_p}}
@@ -52,22 +42,11 @@ optional:
   stop: |
     ,
     "stop": {{json stop}}
-  logprobs: |
-    ,
-    "logprobs": true,
-    "top_logprobs": {{top_logprobs}}
-  seed: |
-    ,
-    "seed": {{seed}}
-  user: |
-    ,
-    "user": {{json user}}
-  stream_options: |
-    ,
-    "stream_options": {"include_usage": true}
 
 # Message format definition - replaces hardcoded `message_builder: openai`
+# DeepSeek uses OpenAI-compatible message format
 message_format:
+  name: openai
   roles:
     user: user
     assistant: assistant
@@ -86,14 +65,9 @@ message_format:
       "image/png": '{"type": "image_url", "image_url": {"url": "data:image/png;base64,{{data}}"}}'
       "image/gif": '{"type": "image_url", "image_url": {"url": "data:image/gif;base64,{{data}}"}}'
       "image/webp": '{"type": "image_url", "image_url": {"url": "data:image/webp;base64,{{data}}"}}'
-      "url": '{"type": "image_url", "image_url": {"url": {{json url}}, "detail": {{json detail}}}}'
+      "url": '{"type": "image_url", "image_url": {"url": {{json url}}}}'
 
-    # Audio content blocks (for GPT-4o audio)
-    audio:
-      "audio/wav": '{"type": "input_audio", "input_audio": {"data": {{json data}}, "format": "wav"}}'
-      "audio/mp3": '{"type": "input_audio", "input_audio": {"data": {{json data}}, "format": "mp3"}}'
-
-    # Tool call in assistant message
+    # Tool use block
     tool_use: |
       {
         "id": {{json id}},
@@ -104,21 +78,19 @@ message_format:
         }
       }
 
-    # Tool result message (note: OpenAI uses a separate message, not a content block)
+    # Tool result message
     tool_result: '{"role": "tool", "tool_call_id": {{json tool_use_id}}, "content": {{json content}}}'
 
   # Complete message template
   message: '{"role": {{json role}}, "content": {{content}}}'
 
-  content_array: true  # Content can be an array for multimodal
-  string_shorthand: true  # OpenAI accepts plain string for text-only content
+  content_array: true   # Content can be an array for multimodal
+  string_shorthand: true  # DeepSeek accepts plain string for text-only content
 
-  # Special handling for assistant messages with tool calls
-  assistant_with_tools: '{"role": "assistant", "content": {{content}}, "tool_calls": {{tool_calls}}}'
-
-# Streaming configuration - uses reusable template
+# Streaming configuration - references reusable template
+# DeepSeek is OpenAI-compatible, so it uses the openai_sse template
 streaming:
-  template: openai_sse
+  template: openai_sse  # Reference to streaming-templates.yaml
 
 response:
   success_codes: [200]
@@ -137,22 +109,13 @@ response:
     message: error.message
     type: error.type
     code: error.code
-    param: error.param
-  transforms:
-    finish_reason:
-      map:
-        stop: stop
-        length: length
-        tool_calls: tool_calls
-        content_filter: content_filter
 
 rate_limits:
-  requests_per_minute: 500
-  tokens_per_minute: 10000
+  requests_per_minute: 60
+  tokens_per_minute: 1000000
   concurrent_requests: 10
 
 authentication:
-  type: bearer
-  env_var: OPENAI_API_KEY
+  type: api_key
+  env_var: DEEPSEEK_API_KEY
   header: Authorization
-  prefix: "Bearer "

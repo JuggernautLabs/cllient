@@ -184,7 +184,7 @@ impl From<&crate::config::ServiceConfig> for ServiceInfo {
             name: config.service.name.clone(),
             base_url: config.service.base_url.clone(),
             model_count: 0, // Filled in by caller
-            message_format: format!("{:?}", config.message_builder),
+            message_format: format!("{:?}", config.message_builder.as_ref().unwrap_or(&Default::default())),
         }
     }
 }

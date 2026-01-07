@@ -100,47 +100,9 @@ message_format:
   content_array: true  # Parts is always an array
   string_shorthand: false  # Google doesn't support string shorthand
 
-# Streaming configuration - replaces hardcoded `parser: google_sse`
+# Streaming configuration - uses reusable template
 streaming:
-  format: text/event-stream
-  line_prefix: "data: "
-
-  # Primary token extraction path
-  token_path: candidates[0].content.parts[0].text
-
-  # Stream end conditions
-  end_conditions:
-    - field: candidates[0].finishReason
-      not_null: true
-    - field: error
-      exists: true
-
-  # Event handlers
-  events:
-    - extract: candidates[0].content.parts[0].text
-      action: content
-      filter: candidates[0].content.parts[0].text
-
-    - extract: candidates[0].content.parts[0].functionCall
-      action: tool_call
-      filter: candidates[0].content.parts[0].functionCall
-
-    - extract: candidates[0].finishReason
-      action: finish
-      filter: candidates[0].finishReason
-
-    - extract: usageMetadata
-      action: usage_update
-      filter: usageMetadata
-
-    - extract: error
-      action: error
-      filter: error
-
-  usage_paths:
-    input_tokens: usageMetadata.promptTokenCount
-    output_tokens: usageMetadata.candidatesTokenCount
-    total_tokens: usageMetadata.totalTokenCount
+  template: google_sse
 
 response:
   success_codes: [200]

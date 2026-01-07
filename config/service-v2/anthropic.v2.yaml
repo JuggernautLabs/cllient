@@ -86,61 +86,9 @@ message_format:
   content_array: true  # Content is always an array in Anthropic format
   string_shorthand: false  # Anthropic doesn't support string shorthand for content
 
-# Streaming configuration - replaces hardcoded `parser: anthropic_sse`
+# Streaming configuration - uses reusable template
 streaming:
-  format: text/event-stream
-  event_type_prefix: "event: "
-
-  # Primary token extraction path
-  token_path: delta.text
-
-  # Stream end conditions
-  end_conditions:
-    - field: type
-      equals: message_stop
-    - field: error
-      exists: true
-
-  # Event handlers
-  events:
-    - type: message_start
-      extract: message
-      action: start
-
-    - type: content_block_start
-      extract: content_block
-      action: content_start
-
-    - type: content_block_delta
-      extract: delta.text
-      action: content
-      filter: delta.text
-
-    - type: content_block_delta
-      extract: delta.partial_json
-      action: tool_call
-      filter: delta.partial_json
-
-    - type: content_block_stop
-      action: content_stop
-
-    - type: message_delta
-      extract: delta
-      action: usage_update
-
-    - type: message_stop
-      action: stop
-
-    - type: error
-      extract: error
-      action: error
-
-  # Usage extraction paths for streaming
-  usage_paths:
-    input_tokens: message.usage.input_tokens
-    output_tokens: usage.output_tokens
-    cache_read_tokens: message.usage.cache_read_input_tokens
-    cache_write_tokens: message.usage.cache_creation_input_tokens
+  template: anthropic_sse
 
 response:
   success_codes: [200]

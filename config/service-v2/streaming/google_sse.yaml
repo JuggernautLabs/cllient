@@ -1,0 +1,44 @@
+# Google SSE Protocol Template
+# Used by: Google Gemini (Vertex AI streaming)
+#
+# This template defines the streaming configuration for Google's
+# Server-Sent Events format with standard "data: " prefix.
+
+format: text/event-stream
+parser: google_sse
+line_prefix: "data: "
+
+# Event handlers
+events:
+  - type: content
+    extract: candidates[0].content.parts[0].text
+    action: content
+    filter: candidates[0].content.parts[0].text
+
+  - type: tool_call
+    extract: candidates[0].content.parts[0].functionCall
+    action: tool_call
+    filter: candidates[0].content.parts[0].functionCall
+
+  - type: finish
+    extract: candidates[0].finishReason
+    action: finish
+    filter: candidates[0].finishReason
+
+  - type: usage
+    extract: usageMetadata
+    action: usage_update
+    filter: usageMetadata
+
+  - type: error
+    extract: error
+    action: error
+    filter: error
+
+# Response field extraction paths
+extract:
+  content: candidates[0].content.parts[0].text
+  finish_reason: candidates[0].finishReason
+  usage.input_tokens: usageMetadata.promptTokenCount
+  usage.output_tokens: usageMetadata.candidatesTokenCount
+  usage.total_tokens: usageMetadata.totalTokenCount

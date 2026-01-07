@@ -70,4 +70,7 @@ pub enum ConfigError {
 
     #[error("Broken references in config: {}", .0.join("; "))]
     BrokenReferences(Vec<String>),
+
+    #[error("Invalid value: {0}")]
+    InvalidValue(String),
 }

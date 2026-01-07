@@ -224,7 +224,7 @@ impl ModelRegistry {
                 Some(ServiceExport {
                     name: service_name.to_string(),
                     base_url: cfg.service.base_url.clone(),
-                    message_format: cfg.message_builder.clone(),
+                    message_format: cfg.message_builder.clone().unwrap_or_default(),
                     rate_limits,
                     model_count: service_model_counts.get(service_name).copied().unwrap_or(0),
                 })

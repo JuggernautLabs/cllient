@@ -1,0 +1,45 @@
+# OpenAI SSE Protocol Template
+# Used by: OpenAI, DeepSeek, and other OpenAI-compatible providers
+#
+# This template defines the streaming configuration for providers that use
+# the OpenAI-compatible SSE format (Server-Sent Events with "data: " prefix).
+
+format: text/event-stream
+parser: openai_sse
+line_prefix: "data: "
+done_marker: "[DONE]"
+
+# Event handlers
+events:
+  - type: content
+    extract: choices[0].delta.content
+    action: content
+    filter: choices[0].delta.content
+
+  - type: role
+    extract: choices[0].delta.role
+    action: role_start
+    filter: choices[0].delta.role
+
+  - type: finish
+    extract: choices[0].finish_reason
+    action: finish
+    filter: choices[0].finish_reason
+
+  - type: tool_call
+    extract: choices[0].delta.tool_calls
+    action: tool_call
+    filter: choices[0].delta.tool_calls
+
+  - type: usage
+    extract: usage
+    action: usage_update
+    filter: usage
+
+# Response field extraction paths
+extract:
+  content: choices[0].delta.content
+  finish_reason: choices[0].finish_reason
+  usage.prompt_tokens: usage.prompt_tokens
+  usage.completion_tokens: usage.completion_tokens
+  usage.total_tokens: usage.total_tokens
