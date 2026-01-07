@@ -1051,11 +1051,17 @@ impl RequestBuilder {
 }
 
 /// Token usage information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Usage {
     pub input_tokens: u32,
     pub output_tokens: u32,
     pub total_tokens: Option<u32>,
+    /// Cache read tokens (Anthropic)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_read_tokens: Option<u32>,
+    /// Cache creation tokens (Anthropic)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_creation_tokens: Option<u32>,
 }
 
 impl Usage {
@@ -1064,15 +1070,323 @@ impl Usage {
             input_tokens,
             output_tokens,
             total_tokens: Some(input_tokens + output_tokens),
+            cache_read_tokens: None,
+            cache_creation_tokens: None,
         }
     }
-    
+
+    /// Create a Usage with all fields specified
+    pub fn with_cache(
+        input_tokens: u32,
+        output_tokens: u32,
+        cache_read_tokens: Option<u32>,
+        cache_creation_tokens: Option<u32>,
+    ) -> Self {
+        Self {
+            input_tokens,
+            output_tokens,
+            total_tokens: Some(input_tokens + output_tokens),
+            cache_read_tokens,
+            cache_creation_tokens,
+        }
+    }
+
     /// Calculate cost based on pricing
     pub fn calculate_cost(&self, input_cost_per_1k: f64, output_cost_per_1k: f64) -> f64 {
         let input_cost = (self.input_tokens as f64 / 1000.0) * input_cost_per_1k;
         let output_cost = (self.output_tokens as f64 / 1000.0) * output_cost_per_1k;
         input_cost + output_cost
     }
+
+    /// Calculate cost including cache pricing (for Anthropic)
+    ///
+    /// # Arguments
+    /// * `input_cost_per_1k` - Cost per 1K input tokens
+    /// * `output_cost_per_1k` - Cost per 1K output tokens
+    /// * `cache_read_cost_per_1k` - Cost per 1K cache read tokens (typically discounted)
+    /// * `cache_creation_cost_per_1k` - Cost per 1K cache creation tokens (typically premium)
+    pub fn calculate_cost_with_cache(
+        &self,
+        input_cost_per_1k: f64,
+        output_cost_per_1k: f64,
+        cache_read_cost_per_1k: f64,
+        cache_creation_cost_per_1k: f64,
+    ) -> f64 {
+        let input_cost = (self.input_tokens as f64 / 1000.0) * input_cost_per_1k;
+        let output_cost = (self.output_tokens as f64 / 1000.0) * output_cost_per_1k;
+        let cache_read_cost = self.cache_read_tokens
+            .map(|t| (t as f64 / 1000.0) * cache_read_cost_per_1k)
+            .unwrap_or(0.0);
+        let cache_creation_cost = self.cache_creation_tokens
+            .map(|t| (t as f64 / 1000.0) * cache_creation_cost_per_1k)
+            .unwrap_or(0.0);
+        input_cost + output_cost + cache_read_cost + cache_creation_cost
+    }
+}
+
+/// Configuration for extracting usage/token count data from JSON responses
+///
+/// This struct defines JSON paths for extracting token usage information from
+/// different LLM provider responses. Each field is an optional JSON path string
+/// using dot notation with array index support (e.g., "usage.prompt_tokens" or
+/// "choices[0].usage.input_tokens").
+///
+/// # Example
+///
+/// ```
+/// use cllient::UsagePathConfig;
+/// use serde_json::json;
+///
+/// // OpenAI-style response
+/// let config = UsagePathConfig::builder()
+///     .input_tokens("usage.prompt_tokens")
+///     .output_tokens("usage.completion_tokens")
+///     .total_tokens("usage.total_tokens")
+///     .build();
+///
+/// let response = json!({
+///     "usage": {
+///         "prompt_tokens": 100,
+///         "completion_tokens": 50,
+///         "total_tokens": 150
+///     }
+/// });
+///
+/// let usage = config.extract(&response);
+/// assert_eq!(usage.input_tokens, 100);
+/// assert_eq!(usage.output_tokens, 50);
+/// assert_eq!(usage.total_tokens, Some(150));
+/// ```
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct UsagePathConfig {
+    /// Path to input/prompt token count
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_tokens: Option<String>,
+    /// Path to output/completion token count
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_tokens: Option<String>,
+    /// Path to total token count
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_tokens: Option<String>,
+    /// Path to cache read tokens (Anthropic)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_read_tokens: Option<String>,
+    /// Path to cache creation tokens (Anthropic)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_creation_tokens: Option<String>,
+}
+
+impl UsagePathConfig {
+    /// Create a new empty UsagePathConfig
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create a builder for constructing UsagePathConfig
+    pub fn builder() -> UsagePathBuilder {
+        UsagePathBuilder::new()
+    }
+
+    /// Create an OpenAI-compatible usage path configuration
+    pub fn openai() -> Self {
+        Self::builder()
+            .input_tokens("usage.prompt_tokens")
+            .output_tokens("usage.completion_tokens")
+            .total_tokens("usage.total_tokens")
+            .build()
+    }
+
+    /// Create an Anthropic-compatible usage path configuration
+    pub fn anthropic() -> Self {
+        Self::builder()
+            .input_tokens("usage.input_tokens")
+            .output_tokens("usage.output_tokens")
+            .cache_read_tokens("usage.cache_read_input_tokens")
+            .cache_creation_tokens("usage.cache_creation_input_tokens")
+            .build()
+    }
+
+    /// Create a Google Gemini-compatible usage path configuration
+    pub fn google() -> Self {
+        Self::builder()
+            .input_tokens("usageMetadata.promptTokenCount")
+            .output_tokens("usageMetadata.candidatesTokenCount")
+            .total_tokens("usageMetadata.totalTokenCount")
+            .build()
+    }
+
+    /// Extract usage information from a JSON value using the configured paths
+    ///
+    /// Returns a Usage struct with extracted values. Fields that cannot be
+    /// extracted will default to 0 (for required fields) or None (for optional fields).
+    pub fn extract(&self, value: &Value) -> Usage {
+        let input_tokens = self.input_tokens.as_ref()
+            .and_then(|path| extract_json_path(path, value))
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32)
+            .unwrap_or(0);
+
+        let output_tokens = self.output_tokens.as_ref()
+            .and_then(|path| extract_json_path(path, value))
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32)
+            .unwrap_or(0);
+
+        let total_tokens = self.total_tokens.as_ref()
+            .and_then(|path| extract_json_path(path, value))
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32);
+
+        let cache_read_tokens = self.cache_read_tokens.as_ref()
+            .and_then(|path| extract_json_path(path, value))
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32);
+
+        let cache_creation_tokens = self.cache_creation_tokens.as_ref()
+            .and_then(|path| extract_json_path(path, value))
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32);
+
+        Usage {
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            cache_read_tokens,
+            cache_creation_tokens,
+        }
+    }
+
+    /// Check if all paths are None (empty configuration)
+    pub fn is_empty(&self) -> bool {
+        self.input_tokens.is_none()
+            && self.output_tokens.is_none()
+            && self.total_tokens.is_none()
+            && self.cache_read_tokens.is_none()
+            && self.cache_creation_tokens.is_none()
+    }
+}
+
+/// Builder for constructing UsagePathConfig with a fluent API
+///
+/// # Example
+///
+/// ```
+/// use cllient::UsagePathBuilder;
+///
+/// let config = UsagePathBuilder::new()
+///     .input_tokens("usage.prompt_tokens")
+///     .output_tokens("usage.completion_tokens")
+///     .total_tokens("usage.total_tokens")
+///     .build();
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct UsagePathBuilder {
+    input_tokens: Option<String>,
+    output_tokens: Option<String>,
+    total_tokens: Option<String>,
+    cache_read_tokens: Option<String>,
+    cache_creation_tokens: Option<String>,
+}
+
+impl UsagePathBuilder {
+    /// Create a new builder with no paths configured
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the path to input/prompt token count
+    pub fn input_tokens(mut self, path: impl Into<String>) -> Self {
+        self.input_tokens = Some(path.into());
+        self
+    }
+
+    /// Set the path to output/completion token count
+    pub fn output_tokens(mut self, path: impl Into<String>) -> Self {
+        self.output_tokens = Some(path.into());
+        self
+    }
+
+    /// Set the path to total token count
+    pub fn total_tokens(mut self, path: impl Into<String>) -> Self {
+        self.total_tokens = Some(path.into());
+        self
+    }
+
+    /// Set the path to cache read tokens (Anthropic)
+    pub fn cache_read_tokens(mut self, path: impl Into<String>) -> Self {
+        self.cache_read_tokens = Some(path.into());
+        self
+    }
+
+    /// Set the path to cache creation tokens (Anthropic)
+    pub fn cache_creation_tokens(mut self, path: impl Into<String>) -> Self {
+        self.cache_creation_tokens = Some(path.into());
+        self
+    }
+
+    /// Build the UsagePathConfig
+    pub fn build(self) -> UsagePathConfig {
+        UsagePathConfig {
+            input_tokens: self.input_tokens,
+            output_tokens: self.output_tokens,
+            total_tokens: self.total_tokens,
+            cache_read_tokens: self.cache_read_tokens,
+            cache_creation_tokens: self.cache_creation_tokens,
+        }
+    }
+}
+
+/// Extract a value from a JSON object using a dot-notation path with array index support
+///
+/// Supports paths like:
+/// - "usage.prompt_tokens"
+/// - "choices[0].message.content"
+/// - "usageMetadata.promptTokenCount"
+/// - "message.usage.input_tokens"
+fn extract_json_path(path: &str, json: &Value) -> Option<Value> {
+    let mut current = json;
+    let mut i = 0;
+    let chars: Vec<char> = path.chars().collect();
+
+    while i < chars.len() {
+        // Find the next part (either before '.' or before '[')
+        let mut part_end = i;
+        while part_end < chars.len() && chars[part_end] != '.' && chars[part_end] != '[' {
+            part_end += 1;
+        }
+
+        if part_end > i {
+            // Extract object key
+            let key: String = chars[i..part_end].iter().collect();
+            current = current.get(&key)?;
+            i = part_end;
+        }
+
+        // Handle array access
+        if i < chars.len() && chars[i] == '[' {
+            i += 1; // Skip '['
+            let mut index_end = i;
+            while index_end < chars.len() && chars[index_end] != ']' {
+                index_end += 1;
+            }
+
+            if index_end >= chars.len() {
+                return None; // Unclosed bracket
+            }
+
+            let index_str: String = chars[i..index_end].iter().collect();
+            let index: usize = index_str.parse().ok()?;
+            current = current.get(index)?;
+            i = index_end + 1; // Skip ']'
+        }
+
+        // Skip '.'
+        if i < chars.len() && chars[i] == '.' {
+            i += 1;
+        }
+    }
+
+    Some(current.clone())
 }
 
 /// Helper trait for creating content from files
@@ -1113,6 +1427,7 @@ impl FromFile for ContentBlock {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_image_format_detection() {
@@ -1180,5 +1495,435 @@ mod tests {
 
         let cost = usage.calculate_cost(0.01, 0.03); // $0.01 input, $0.03 output per 1k
         assert_eq!(cost, 0.025); // (1000/1000 * 0.01) + (500/1000 * 0.03)
+    }
+
+    // =========================================================================
+    // UsagePathConfig Tests
+    // =========================================================================
+
+    #[test]
+    fn test_usage_path_builder_basic() {
+        let config = UsagePathBuilder::new()
+            .input_tokens("usage.prompt_tokens")
+            .output_tokens("usage.completion_tokens")
+            .build();
+
+        assert_eq!(config.input_tokens, Some("usage.prompt_tokens".to_string()));
+        assert_eq!(config.output_tokens, Some("usage.completion_tokens".to_string()));
+        assert_eq!(config.total_tokens, None);
+        assert_eq!(config.cache_read_tokens, None);
+        assert_eq!(config.cache_creation_tokens, None);
+    }
+
+    #[test]
+    fn test_usage_path_builder_full() {
+        let config = UsagePathBuilder::new()
+            .input_tokens("usage.input_tokens")
+            .output_tokens("usage.output_tokens")
+            .total_tokens("usage.total_tokens")
+            .cache_read_tokens("usage.cache_read")
+            .cache_creation_tokens("usage.cache_creation")
+            .build();
+
+        assert_eq!(config.input_tokens, Some("usage.input_tokens".to_string()));
+        assert_eq!(config.output_tokens, Some("usage.output_tokens".to_string()));
+        assert_eq!(config.total_tokens, Some("usage.total_tokens".to_string()));
+        assert_eq!(config.cache_read_tokens, Some("usage.cache_read".to_string()));
+        assert_eq!(config.cache_creation_tokens, Some("usage.cache_creation".to_string()));
+    }
+
+    #[test]
+    fn test_usage_path_config_openai_preset() {
+        let config = UsagePathConfig::openai();
+
+        assert_eq!(config.input_tokens, Some("usage.prompt_tokens".to_string()));
+        assert_eq!(config.output_tokens, Some("usage.completion_tokens".to_string()));
+        assert_eq!(config.total_tokens, Some("usage.total_tokens".to_string()));
+        assert_eq!(config.cache_read_tokens, None);
+    }
+
+    #[test]
+    fn test_usage_path_config_anthropic_preset() {
+        let config = UsagePathConfig::anthropic();
+
+        assert_eq!(config.input_tokens, Some("usage.input_tokens".to_string()));
+        assert_eq!(config.output_tokens, Some("usage.output_tokens".to_string()));
+        assert_eq!(config.total_tokens, None);
+        assert_eq!(config.cache_read_tokens, Some("usage.cache_read_input_tokens".to_string()));
+        assert_eq!(config.cache_creation_tokens, Some("usage.cache_creation_input_tokens".to_string()));
+    }
+
+    #[test]
+    fn test_usage_path_config_google_preset() {
+        let config = UsagePathConfig::google();
+
+        assert_eq!(config.input_tokens, Some("usageMetadata.promptTokenCount".to_string()));
+        assert_eq!(config.output_tokens, Some("usageMetadata.candidatesTokenCount".to_string()));
+        assert_eq!(config.total_tokens, Some("usageMetadata.totalTokenCount".to_string()));
+    }
+
+    #[test]
+    fn test_usage_extract_openai_response() {
+        let config = UsagePathConfig::openai();
+
+        let response = json!({
+            "id": "chatcmpl-123",
+            "choices": [{
+                "message": {"role": "assistant", "content": "Hello!"},
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 50,
+                "total_tokens": 150
+            }
+        });
+
+        let usage = config.extract(&response);
+        assert_eq!(usage.input_tokens, 100);
+        assert_eq!(usage.output_tokens, 50);
+        assert_eq!(usage.total_tokens, Some(150));
+        assert_eq!(usage.cache_read_tokens, None);
+        assert_eq!(usage.cache_creation_tokens, None);
+    }
+
+    #[test]
+    fn test_usage_extract_anthropic_response() {
+        let config = UsagePathConfig::anthropic();
+
+        let response = json!({
+            "id": "msg_123",
+            "role": "assistant",
+            "content": [{"type": "text", "text": "Hello!"}],
+            "usage": {
+                "input_tokens": 200,
+                "output_tokens": 75,
+                "cache_read_input_tokens": 50,
+                "cache_creation_input_tokens": 25
+            }
+        });
+
+        let usage = config.extract(&response);
+        assert_eq!(usage.input_tokens, 200);
+        assert_eq!(usage.output_tokens, 75);
+        assert_eq!(usage.total_tokens, None);
+        assert_eq!(usage.cache_read_tokens, Some(50));
+        assert_eq!(usage.cache_creation_tokens, Some(25));
+    }
+
+    #[test]
+    fn test_usage_extract_google_response() {
+        let config = UsagePathConfig::google();
+
+        let response = json!({
+            "candidates": [{
+                "content": {"parts": [{"text": "Hello!"}], "role": "model"}
+            }],
+            "usageMetadata": {
+                "promptTokenCount": 150,
+                "candidatesTokenCount": 80,
+                "totalTokenCount": 230
+            }
+        });
+
+        let usage = config.extract(&response);
+        assert_eq!(usage.input_tokens, 150);
+        assert_eq!(usage.output_tokens, 80);
+        assert_eq!(usage.total_tokens, Some(230));
+    }
+
+    #[test]
+    fn test_usage_extract_with_array_index() {
+        let config = UsagePathBuilder::new()
+            .input_tokens("responses[0].usage.input")
+            .output_tokens("responses[0].usage.output")
+            .build();
+
+        let response = json!({
+            "responses": [{
+                "usage": {
+                    "input": 300,
+                    "output": 125
+                }
+            }]
+        });
+
+        let usage = config.extract(&response);
+        assert_eq!(usage.input_tokens, 300);
+        assert_eq!(usage.output_tokens, 125);
+    }
+
+    #[test]
+    fn test_usage_extract_nested_array() {
+        let config = UsagePathBuilder::new()
+            .input_tokens("data[0].results[1].tokens.input")
+            .output_tokens("data[0].results[1].tokens.output")
+            .build();
+
+        let response = json!({
+            "data": [{
+                "results": [
+                    {"tokens": {"input": 10, "output": 5}},
+                    {"tokens": {"input": 400, "output": 200}}
+                ]
+            }]
+        });
+
+        let usage = config.extract(&response);
+        assert_eq!(usage.input_tokens, 400);
+        assert_eq!(usage.output_tokens, 200);
+    }
+
+    #[test]
+    fn test_usage_extract_missing_path_returns_zero() {
+        let config = UsagePathConfig::openai();
+
+        let response = json!({
+            "id": "chatcmpl-123",
+            "choices": [{"message": {"content": "Hello!"}}]
+            // No usage field
+        });
+
+        let usage = config.extract(&response);
+        assert_eq!(usage.input_tokens, 0);
+        assert_eq!(usage.output_tokens, 0);
+        assert_eq!(usage.total_tokens, None);
+    }
+
+    #[test]
+    fn test_usage_extract_partial_response() {
+        let config = UsagePathConfig::openai();
+
+        let response = json!({
+            "usage": {
+                "prompt_tokens": 100
+                // Missing completion_tokens and total_tokens
+            }
+        });
+
+        let usage = config.extract(&response);
+        assert_eq!(usage.input_tokens, 100);
+        assert_eq!(usage.output_tokens, 0);
+        assert_eq!(usage.total_tokens, None);
+    }
+
+    #[test]
+    fn test_usage_extract_empty_config() {
+        let config = UsagePathConfig::new();
+
+        let response = json!({
+            "usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 50
+            }
+        });
+
+        let usage = config.extract(&response);
+        assert_eq!(usage.input_tokens, 0);
+        assert_eq!(usage.output_tokens, 0);
+        assert_eq!(usage.total_tokens, None);
+    }
+
+    #[test]
+    fn test_usage_path_config_is_empty() {
+        let empty = UsagePathConfig::new();
+        assert!(empty.is_empty());
+
+        let with_input = UsagePathBuilder::new()
+            .input_tokens("usage.input")
+            .build();
+        assert!(!with_input.is_empty());
+
+        let full = UsagePathConfig::openai();
+        assert!(!full.is_empty());
+    }
+
+    #[test]
+    fn test_usage_path_config_serialization() {
+        let config = UsagePathConfig::openai();
+        let serialized = serde_json::to_string(&config).unwrap();
+        let deserialized: UsagePathConfig = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(config, deserialized);
+    }
+
+    #[test]
+    fn test_usage_path_config_yaml_deserialization() {
+        let yaml = r#"
+input_tokens: usage.prompt_tokens
+output_tokens: usage.completion_tokens
+total_tokens: usage.total_tokens
+"#;
+        let config: UsagePathConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.input_tokens, Some("usage.prompt_tokens".to_string()));
+        assert_eq!(config.output_tokens, Some("usage.completion_tokens".to_string()));
+        assert_eq!(config.total_tokens, Some("usage.total_tokens".to_string()));
+    }
+
+    #[test]
+    fn test_extract_json_path_simple() {
+        let json = json!({"usage": {"tokens": 100}});
+        let result = extract_json_path("usage.tokens", &json);
+        assert_eq!(result, Some(json!(100)));
+    }
+
+    #[test]
+    fn test_extract_json_path_array() {
+        let json = json!({"items": [{"value": 1}, {"value": 2}]});
+        let result = extract_json_path("items[1].value", &json);
+        assert_eq!(result, Some(json!(2)));
+    }
+
+    #[test]
+    fn test_extract_json_path_deeply_nested() {
+        let json = json!({
+            "level1": {
+                "level2": {
+                    "level3": {
+                        "value": "deep"
+                    }
+                }
+            }
+        });
+        let result = extract_json_path("level1.level2.level3.value", &json);
+        assert_eq!(result, Some(json!("deep")));
+    }
+
+    #[test]
+    fn test_extract_json_path_invalid() {
+        let json = json!({"usage": {"tokens": 100}});
+
+        // Invalid key
+        let result = extract_json_path("nonexistent.path", &json);
+        assert_eq!(result, None);
+
+        // Invalid array index
+        let result = extract_json_path("usage[0]", &json);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_extract_json_path_unclosed_bracket() {
+        let json = json!({"items": [{"value": 1}]});
+        let result = extract_json_path("items[0", &json);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_usage_with_cache_constructor() {
+        let usage = Usage::with_cache(1000, 500, Some(200), Some(100));
+
+        assert_eq!(usage.input_tokens, 1000);
+        assert_eq!(usage.output_tokens, 500);
+        assert_eq!(usage.total_tokens, Some(1500));
+        assert_eq!(usage.cache_read_tokens, Some(200));
+        assert_eq!(usage.cache_creation_tokens, Some(100));
+    }
+
+    #[test]
+    fn test_usage_calculate_cost_with_cache() {
+        let usage = Usage::with_cache(1000, 500, Some(1000), Some(500));
+
+        // $0.01 input, $0.03 output, $0.005 cache read, $0.02 cache creation per 1k
+        let cost = usage.calculate_cost_with_cache(0.01, 0.03, 0.005, 0.02);
+
+        // (1000/1000 * 0.01) + (500/1000 * 0.03) + (1000/1000 * 0.005) + (500/1000 * 0.02)
+        // = 0.01 + 0.015 + 0.005 + 0.01 = 0.04
+        assert!((cost - 0.04).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_usage_calculate_cost_with_cache_no_cache_used() {
+        let usage = Usage::new(1000, 500);
+
+        // Without cache tokens, should still work
+        let cost = usage.calculate_cost_with_cache(0.01, 0.03, 0.005, 0.02);
+
+        // Just input + output: 0.01 + 0.015 = 0.025
+        assert!((cost - 0.025).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_streaming_usage_path_extraction() {
+        // Simulates usage extraction from streaming response (OpenAI with include_usage=true)
+        let config = UsagePathBuilder::new()
+            .input_tokens("usage.prompt_tokens")
+            .output_tokens("usage.completion_tokens")
+            .total_tokens("usage.total_tokens")
+            .build();
+
+        let streaming_chunk = json!({
+            "id": "chatcmpl-123",
+            "choices": [],
+            "usage": {
+                "prompt_tokens": 50,
+                "completion_tokens": 25,
+                "total_tokens": 75
+            }
+        });
+
+        let usage = config.extract(&streaming_chunk);
+        assert_eq!(usage.input_tokens, 50);
+        assert_eq!(usage.output_tokens, 25);
+        assert_eq!(usage.total_tokens, Some(75));
+    }
+
+    #[test]
+    fn test_anthropic_streaming_usage_paths() {
+        // Anthropic streaming has different structure for message_start vs message_delta
+        let message_start_config = UsagePathBuilder::new()
+            .input_tokens("message.usage.input_tokens")
+            .cache_read_tokens("message.usage.cache_read_input_tokens")
+            .build();
+
+        let message_start = json!({
+            "type": "message_start",
+            "message": {
+                "usage": {
+                    "input_tokens": 100,
+                    "cache_read_input_tokens": 50
+                }
+            }
+        });
+
+        let usage = message_start_config.extract(&message_start);
+        assert_eq!(usage.input_tokens, 100);
+        assert_eq!(usage.cache_read_tokens, Some(50));
+
+        // For message_delta, output tokens come differently
+        let message_delta_config = UsagePathBuilder::new()
+            .output_tokens("usage.output_tokens")
+            .build();
+
+        let message_delta = json!({
+            "type": "message_delta",
+            "usage": {
+                "output_tokens": 75
+            }
+        });
+
+        let delta_usage = message_delta_config.extract(&message_delta);
+        assert_eq!(delta_usage.output_tokens, 75);
+    }
+
+    #[test]
+    fn test_usage_default() {
+        let usage = Usage::default();
+        assert_eq!(usage.input_tokens, 0);
+        assert_eq!(usage.output_tokens, 0);
+        assert_eq!(usage.total_tokens, None);
+        assert_eq!(usage.cache_read_tokens, None);
+        assert_eq!(usage.cache_creation_tokens, None);
+    }
+
+    #[test]
+    fn test_usage_path_from_builder_via_config() {
+        // Test that UsagePathConfig::builder() returns a working builder
+        let config = UsagePathConfig::builder()
+            .input_tokens("a.b.c")
+            .output_tokens("x.y.z")
+            .build();
+
+        assert_eq!(config.input_tokens, Some("a.b.c".to_string()));
+        assert_eq!(config.output_tokens, Some("x.y.z".to_string()));
     }
 }

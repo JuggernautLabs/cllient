@@ -14,6 +14,8 @@ pub mod registry_index;
 pub mod validation;
 pub mod query;
 pub mod message_format;
+pub mod transform;
+pub mod jsonpath;
 
 #[cfg(feature = "plugin")]
 pub mod events;
@@ -38,7 +40,7 @@ pub use client::{
     LowLevelClient, HttpClient, ClientFactory, ConfigProvider,
     FileBasedClientFactory, EmbeddedClientFactory
 };
-pub use error::{ClientError, Result};
+pub use error::{ClientError, Result, ApiError, ErrorExtractorConfig, ErrorExtractorBuilder};
 pub use types::{
     CompletionRequest, CompletionResponse, MessageContent, ContentBlock,
     ImageFormat, AudioFormat, DocumentFormat, Usage, FromFile, RequestBuilder, Message, MessageList
@@ -46,6 +48,13 @@ pub use types::{
 pub use private::Private;
 pub use runtime::ModelRegistry;
 pub use chat::{ChatterId, ChatBuilder};
+pub use transform::{
+    ValueTransform, TransformType, TransformBuilder, TransformEngine,
+    TransformConfig, FieldTransformConfig, get_value,
+};
+pub use jsonpath::{
+    JsonPath, JsonPathBuilder, JsonPathError, JsonPathSet, Segment as JsonPathSegment,
+};
 
 // Plugin exports (feature-gated)
 #[cfg(feature = "plugin")]
