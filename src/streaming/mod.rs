@@ -29,6 +29,7 @@ pub mod parsers;
 pub mod json_utils;
 pub mod error;
 pub mod compat;
+pub mod end_condition;
 
 // Re-exports for convenience
 pub use parsers::{JsonStreamProcessor, process_complete_text};

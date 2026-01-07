@@ -205,6 +205,8 @@ impl HttpClient {
                 input_tokens,
                 output_tokens,
                 total_tokens,
+                cache_read_tokens: None,
+                cache_creation_tokens: None,
             })
         } else {
             None

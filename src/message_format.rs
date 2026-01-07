@@ -46,6 +46,353 @@ use crate::error::{ClientError, Result};
 use crate::types::{ContentBlock, MessageContent};
 
 // ============================================================================
+// Role Mapping Types
+// ============================================================================
+
+/// Standard role names used internally across all providers.
+///
+/// These represent the canonical role types that the library uses internally,
+/// which are then mapped to provider-specific role names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StandardRole {
+    /// The user/human in the conversation
+    User,
+    /// The AI assistant's response
+    Assistant,
+    /// System instructions (may be handled separately by some providers)
+    System,
+    /// Tool/function call results
+    Tool,
+}
+
+impl StandardRole {
+    /// Returns all standard roles as an array.
+    pub fn all() -> [StandardRole; 4] {
+        [
+            StandardRole::User,
+            StandardRole::Assistant,
+            StandardRole::System,
+            StandardRole::Tool,
+        ]
+    }
+
+    /// Returns the default provider name for this role.
+    /// This is used as a fallback when no mapping is configured.
+    pub fn default_name(&self) -> &'static str {
+        match self {
+            StandardRole::User => "user",
+            StandardRole::Assistant => "assistant",
+            StandardRole::System => "system",
+            StandardRole::Tool => "tool",
+        }
+    }
+}
+
+impl std::fmt::Display for StandardRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.default_name())
+    }
+}
+
+impl std::str::FromStr for StandardRole {
+    type Err = ClientError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "user" => Ok(StandardRole::User),
+            "assistant" => Ok(StandardRole::Assistant),
+            "system" => Ok(StandardRole::System),
+            "tool" => Ok(StandardRole::Tool),
+            _ => Err(ClientError::ValidationError(format!(
+                "Unknown role: '{}'. Expected one of: user, assistant, system, tool",
+                s
+            ))),
+        }
+    }
+}
+
+/// Configuration for how system messages are handled by a provider.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SystemHandling {
+    /// System messages are included inline as regular messages with a "system" role.
+    /// Used by: OpenAI
+    #[default]
+    Inline,
+    /// System messages are extracted and passed separately (e.g., top-level "system" field).
+    /// Used by: Anthropic (top-level "system" parameter), Google (systemInstruction)
+    Separate,
+}
+
+/// Role mapping configuration for translating between standard and provider-specific role names.
+///
+/// Different LLM providers use different names for message roles:
+/// - OpenAI: user, assistant, system, tool
+/// - Anthropic: user, assistant (system handled separately)
+/// - Google: user, model (system via systemInstruction)
+///
+/// This struct provides bidirectional mapping between the standard role names
+/// used internally and the provider-specific names required by each API.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RoleMappingConfig {
+    /// Map from standard role to provider role name
+    #[serde(default)]
+    mappings: HashMap<StandardRole, String>,
+
+    /// How system messages are handled
+    #[serde(default)]
+    pub system_handling: SystemHandling,
+
+    /// Reverse map for response parsing (provider role name -> standard role)
+    /// This is computed from mappings and not serialized.
+    #[serde(skip)]
+    reverse: HashMap<String, StandardRole>,
+}
+
+impl RoleMappingConfig {
+    /// Create a new empty role mapping configuration.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create a role mapping configuration from a hashmap of mappings.
+    pub fn from_mappings(mappings: HashMap<StandardRole, String>) -> Self {
+        let mut config = Self {
+            mappings,
+            system_handling: SystemHandling::default(),
+            reverse: HashMap::new(),
+        };
+        config.rebuild_reverse_map();
+        config
+    }
+
+    /// Set the system handling mode.
+    pub fn with_system_handling(mut self, handling: SystemHandling) -> Self {
+        self.system_handling = handling;
+        self
+    }
+
+    /// Build the reverse mapping from provider names to standard roles.
+    /// This should be called after deserialization or after modifying mappings.
+    pub fn rebuild_reverse_map(&mut self) {
+        self.reverse.clear();
+        for (standard, provider) in &self.mappings {
+            self.reverse.insert(provider.clone(), *standard);
+        }
+    }
+
+    /// Get the provider role name for a standard role.
+    ///
+    /// If no mapping exists, returns the default name for the role.
+    pub fn to_provider(&self, role: StandardRole) -> &str {
+        self.mappings
+            .get(&role)
+            .map(|s| s.as_str())
+            .unwrap_or_else(|| role.default_name())
+    }
+
+    /// Get the standard role from a provider role name.
+    ///
+    /// Returns None if the provider role is not recognized.
+    pub fn from_provider(&self, provider_role: &str) -> Option<StandardRole> {
+        // First check the reverse map
+        if let Some(role) = self.reverse.get(provider_role) {
+            return Some(*role);
+        }
+
+        // Fall back to checking if it matches a default name
+        provider_role.parse().ok()
+    }
+
+    /// Check if a mapping exists for the given standard role.
+    pub fn has_mapping(&self, role: StandardRole) -> bool {
+        self.mappings.contains_key(&role)
+    }
+
+    /// Get all configured mappings.
+    pub fn mappings(&self) -> &HashMap<StandardRole, String> {
+        &self.mappings
+    }
+
+    /// Check if this provider handles system messages separately.
+    pub fn handles_system_separately(&self) -> bool {
+        self.system_handling == SystemHandling::Separate
+    }
+}
+
+/// Builder for constructing RoleMappingConfig with a fluent API.
+///
+/// # Example
+///
+/// ```
+/// use cllient::message_format::{RoleMappingBuilder, StandardRole};
+///
+/// let config = RoleMappingBuilder::new()
+///     .user("user")
+///     .assistant("model")  // Google uses "model" instead of "assistant"
+///     .system_separate()   // Google handles system via systemInstruction
+///     .build();
+///
+/// assert_eq!(config.to_provider(StandardRole::Assistant), "model");
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct RoleMappingBuilder {
+    mappings: HashMap<StandardRole, String>,
+    system_handling: SystemHandling,
+}
+
+impl RoleMappingBuilder {
+    /// Create a new builder with no mappings.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the provider name for the User role.
+    pub fn user(mut self, provider_name: impl Into<String>) -> Self {
+        self.mappings.insert(StandardRole::User, provider_name.into());
+        self
+    }
+
+    /// Set the provider name for the Assistant role.
+    pub fn assistant(mut self, provider_name: impl Into<String>) -> Self {
+        self.mappings.insert(StandardRole::Assistant, provider_name.into());
+        self
+    }
+
+    /// Set the provider name for the System role.
+    pub fn system(mut self, provider_name: impl Into<String>) -> Self {
+        self.mappings.insert(StandardRole::System, provider_name.into());
+        self
+    }
+
+    /// Set the provider name for the Tool role.
+    pub fn tool(mut self, provider_name: impl Into<String>) -> Self {
+        self.mappings.insert(StandardRole::Tool, provider_name.into());
+        self
+    }
+
+    /// Set a custom mapping for any role.
+    pub fn map(mut self, role: StandardRole, provider_name: impl Into<String>) -> Self {
+        self.mappings.insert(role, provider_name.into());
+        self
+    }
+
+    /// Set system handling to inline (system messages are regular messages).
+    pub fn system_inline(mut self) -> Self {
+        self.system_handling = SystemHandling::Inline;
+        self
+    }
+
+    /// Set system handling to separate (system messages extracted to separate field).
+    pub fn system_separate(mut self) -> Self {
+        self.system_handling = SystemHandling::Separate;
+        self
+    }
+
+    /// Build the RoleMappingConfig.
+    pub fn build(self) -> RoleMappingConfig {
+        let mut config = RoleMappingConfig {
+            mappings: self.mappings,
+            system_handling: self.system_handling,
+            reverse: HashMap::new(),
+        };
+        config.rebuild_reverse_map();
+        config
+    }
+
+    // ========================================================================
+    // Provider Presets
+    // ========================================================================
+
+    /// Create an OpenAI-compatible role mapping.
+    ///
+    /// OpenAI uses standard role names:
+    /// - user -> user
+    /// - assistant -> assistant
+    /// - system -> system (inline)
+    /// - tool -> tool
+    pub fn openai() -> RoleMappingConfig {
+        RoleMappingBuilder::new()
+            .user("user")
+            .assistant("assistant")
+            .system("system")
+            .tool("tool")
+            .system_inline()
+            .build()
+    }
+
+    /// Create an Anthropic-compatible role mapping.
+    ///
+    /// Anthropic uses:
+    /// - user -> user
+    /// - assistant -> assistant
+    /// - system -> handled separately (top-level "system" parameter)
+    /// - tool -> not directly mapped (tool results are content blocks)
+    pub fn anthropic() -> RoleMappingConfig {
+        RoleMappingBuilder::new()
+            .user("user")
+            .assistant("assistant")
+            .system_separate()
+            .build()
+    }
+
+    /// Create a Google (Gemini)-compatible role mapping.
+    ///
+    /// Google uses:
+    /// - user -> user
+    /// - assistant -> model (Google uses "model" instead of "assistant")
+    /// - system -> handled separately (via systemInstruction)
+    /// - tool -> not directly mapped (function responses are content parts)
+    pub fn google() -> RoleMappingConfig {
+        RoleMappingBuilder::new()
+            .user("user")
+            .assistant("model")
+            .system_separate()
+            .build()
+    }
+
+    /// Create a DeepSeek-compatible role mapping.
+    ///
+    /// DeepSeek uses OpenAI-compatible role names:
+    /// - user -> user
+    /// - assistant -> assistant
+    /// - system -> system (inline)
+    /// - tool -> tool
+    pub fn deepseek() -> RoleMappingConfig {
+        Self::openai()
+    }
+
+    /// Create a Mistral-compatible role mapping.
+    ///
+    /// Mistral uses OpenAI-compatible role names:
+    /// - user -> user
+    /// - assistant -> assistant
+    /// - system -> system (inline)
+    /// - tool -> tool
+    pub fn mistral() -> RoleMappingConfig {
+        Self::openai()
+    }
+
+    /// Create a Cohere-compatible role mapping.
+    ///
+    /// Cohere uses different role names:
+    /// - user -> USER
+    /// - assistant -> CHATBOT
+    /// - system -> SYSTEM (inline)
+    /// - tool -> TOOL
+    pub fn cohere() -> RoleMappingConfig {
+        RoleMappingBuilder::new()
+            .user("USER")
+            .assistant("CHATBOT")
+            .system("SYSTEM")
+            .tool("TOOL")
+            .system_inline()
+            .build()
+    }
+}
+
+// ============================================================================
 // Configuration Types
 // ============================================================================
 
@@ -1280,5 +1627,373 @@ mod tests {
         assert_eq!(content[2]["type"], "text");
         assert_eq!(content[3]["type"], "audio");
         assert_eq!(content[4]["type"], "image_url");
+    }
+
+    // ========================================================================
+    // Role Mapping Tests
+    // ========================================================================
+
+    #[test]
+    fn test_standard_role_default_names() {
+        assert_eq!(StandardRole::User.default_name(), "user");
+        assert_eq!(StandardRole::Assistant.default_name(), "assistant");
+        assert_eq!(StandardRole::System.default_name(), "system");
+        assert_eq!(StandardRole::Tool.default_name(), "tool");
+    }
+
+    #[test]
+    fn test_standard_role_display() {
+        assert_eq!(format!("{}", StandardRole::User), "user");
+        assert_eq!(format!("{}", StandardRole::Assistant), "assistant");
+        assert_eq!(format!("{}", StandardRole::System), "system");
+        assert_eq!(format!("{}", StandardRole::Tool), "tool");
+    }
+
+    #[test]
+    fn test_standard_role_from_str() {
+        assert_eq!("user".parse::<StandardRole>().unwrap(), StandardRole::User);
+        assert_eq!("assistant".parse::<StandardRole>().unwrap(), StandardRole::Assistant);
+        assert_eq!("system".parse::<StandardRole>().unwrap(), StandardRole::System);
+        assert_eq!("tool".parse::<StandardRole>().unwrap(), StandardRole::Tool);
+
+        // Case insensitive
+        assert_eq!("USER".parse::<StandardRole>().unwrap(), StandardRole::User);
+        assert_eq!("Assistant".parse::<StandardRole>().unwrap(), StandardRole::Assistant);
+        assert_eq!("SYSTEM".parse::<StandardRole>().unwrap(), StandardRole::System);
+
+        // Invalid role
+        assert!("unknown".parse::<StandardRole>().is_err());
+    }
+
+    #[test]
+    fn test_standard_role_all() {
+        let all = StandardRole::all();
+        assert_eq!(all.len(), 4);
+        assert!(all.contains(&StandardRole::User));
+        assert!(all.contains(&StandardRole::Assistant));
+        assert!(all.contains(&StandardRole::System));
+        assert!(all.contains(&StandardRole::Tool));
+    }
+
+    #[test]
+    fn test_role_mapping_builder_basic() {
+        let config = RoleMappingBuilder::new()
+            .user("user")
+            .assistant("assistant")
+            .system("system")
+            .tool("tool")
+            .build();
+
+        assert_eq!(config.to_provider(StandardRole::User), "user");
+        assert_eq!(config.to_provider(StandardRole::Assistant), "assistant");
+        assert_eq!(config.to_provider(StandardRole::System), "system");
+        assert_eq!(config.to_provider(StandardRole::Tool), "tool");
+    }
+
+    #[test]
+    fn test_role_mapping_builder_custom_names() {
+        let config = RoleMappingBuilder::new()
+            .user("human")
+            .assistant("ai")
+            .system("instructions")
+            .tool("function")
+            .build();
+
+        assert_eq!(config.to_provider(StandardRole::User), "human");
+        assert_eq!(config.to_provider(StandardRole::Assistant), "ai");
+        assert_eq!(config.to_provider(StandardRole::System), "instructions");
+        assert_eq!(config.to_provider(StandardRole::Tool), "function");
+    }
+
+    #[test]
+    fn test_role_mapping_builder_map_method() {
+        let config = RoleMappingBuilder::new()
+            .map(StandardRole::User, "custom_user")
+            .map(StandardRole::Assistant, "custom_assistant")
+            .build();
+
+        assert_eq!(config.to_provider(StandardRole::User), "custom_user");
+        assert_eq!(config.to_provider(StandardRole::Assistant), "custom_assistant");
+    }
+
+    #[test]
+    fn test_role_mapping_default_fallback() {
+        // Empty config should use default names
+        let config = RoleMappingBuilder::new().build();
+
+        assert_eq!(config.to_provider(StandardRole::User), "user");
+        assert_eq!(config.to_provider(StandardRole::Assistant), "assistant");
+        assert_eq!(config.to_provider(StandardRole::System), "system");
+        assert_eq!(config.to_provider(StandardRole::Tool), "tool");
+    }
+
+    #[test]
+    fn test_role_mapping_partial_config() {
+        // Only configure some roles, others should use defaults
+        let config = RoleMappingBuilder::new()
+            .assistant("model")
+            .build();
+
+        assert_eq!(config.to_provider(StandardRole::User), "user"); // default
+        assert_eq!(config.to_provider(StandardRole::Assistant), "model"); // custom
+        assert_eq!(config.to_provider(StandardRole::System), "system"); // default
+    }
+
+    #[test]
+    fn test_role_mapping_reverse_lookup() {
+        let config = RoleMappingBuilder::new()
+            .user("user")
+            .assistant("model")
+            .build();
+
+        // Lookup by provider name
+        assert_eq!(config.from_provider("user"), Some(StandardRole::User));
+        assert_eq!(config.from_provider("model"), Some(StandardRole::Assistant));
+
+        // Default names still work even if not explicitly mapped
+        assert_eq!(config.from_provider("system"), Some(StandardRole::System));
+        assert_eq!(config.from_provider("tool"), Some(StandardRole::Tool));
+
+        // Unknown provider role
+        assert_eq!(config.from_provider("unknown"), None);
+    }
+
+    #[test]
+    fn test_role_mapping_google_reverse() {
+        let config = RoleMappingBuilder::google();
+
+        // Forward lookup
+        assert_eq!(config.to_provider(StandardRole::User), "user");
+        assert_eq!(config.to_provider(StandardRole::Assistant), "model");
+
+        // Reverse lookup
+        assert_eq!(config.from_provider("user"), Some(StandardRole::User));
+        assert_eq!(config.from_provider("model"), Some(StandardRole::Assistant));
+
+        // "assistant" should still work via default fallback
+        assert_eq!(config.from_provider("assistant"), Some(StandardRole::Assistant));
+    }
+
+    #[test]
+    fn test_role_mapping_has_mapping() {
+        let config = RoleMappingBuilder::new()
+            .user("user")
+            .assistant("model")
+            .build();
+
+        assert!(config.has_mapping(StandardRole::User));
+        assert!(config.has_mapping(StandardRole::Assistant));
+        assert!(!config.has_mapping(StandardRole::System));
+        assert!(!config.has_mapping(StandardRole::Tool));
+    }
+
+    #[test]
+    fn test_role_mapping_system_handling_inline() {
+        let config = RoleMappingBuilder::new()
+            .system("system")
+            .system_inline()
+            .build();
+
+        assert_eq!(config.system_handling, SystemHandling::Inline);
+        assert!(!config.handles_system_separately());
+    }
+
+    #[test]
+    fn test_role_mapping_system_handling_separate() {
+        let config = RoleMappingBuilder::new()
+            .system_separate()
+            .build();
+
+        assert_eq!(config.system_handling, SystemHandling::Separate);
+        assert!(config.handles_system_separately());
+    }
+
+    #[test]
+    fn test_openai_preset() {
+        let config = RoleMappingBuilder::openai();
+
+        assert_eq!(config.to_provider(StandardRole::User), "user");
+        assert_eq!(config.to_provider(StandardRole::Assistant), "assistant");
+        assert_eq!(config.to_provider(StandardRole::System), "system");
+        assert_eq!(config.to_provider(StandardRole::Tool), "tool");
+        assert_eq!(config.system_handling, SystemHandling::Inline);
+        assert!(!config.handles_system_separately());
+    }
+
+    #[test]
+    fn test_anthropic_preset() {
+        let config = RoleMappingBuilder::anthropic();
+
+        assert_eq!(config.to_provider(StandardRole::User), "user");
+        assert_eq!(config.to_provider(StandardRole::Assistant), "assistant");
+        assert_eq!(config.system_handling, SystemHandling::Separate);
+        assert!(config.handles_system_separately());
+    }
+
+    #[test]
+    fn test_google_preset() {
+        let config = RoleMappingBuilder::google();
+
+        assert_eq!(config.to_provider(StandardRole::User), "user");
+        assert_eq!(config.to_provider(StandardRole::Assistant), "model");
+        assert_eq!(config.system_handling, SystemHandling::Separate);
+        assert!(config.handles_system_separately());
+    }
+
+    #[test]
+    fn test_cohere_preset() {
+        let config = RoleMappingBuilder::cohere();
+
+        assert_eq!(config.to_provider(StandardRole::User), "USER");
+        assert_eq!(config.to_provider(StandardRole::Assistant), "CHATBOT");
+        assert_eq!(config.to_provider(StandardRole::System), "SYSTEM");
+        assert_eq!(config.to_provider(StandardRole::Tool), "TOOL");
+        assert_eq!(config.system_handling, SystemHandling::Inline);
+    }
+
+    #[test]
+    fn test_deepseek_preset() {
+        // DeepSeek should be OpenAI-compatible
+        let deepseek = RoleMappingBuilder::deepseek();
+        let openai = RoleMappingBuilder::openai();
+
+        assert_eq!(deepseek.to_provider(StandardRole::User), openai.to_provider(StandardRole::User));
+        assert_eq!(deepseek.to_provider(StandardRole::Assistant), openai.to_provider(StandardRole::Assistant));
+        assert_eq!(deepseek.to_provider(StandardRole::System), openai.to_provider(StandardRole::System));
+        assert_eq!(deepseek.to_provider(StandardRole::Tool), openai.to_provider(StandardRole::Tool));
+        assert_eq!(deepseek.system_handling, openai.system_handling);
+    }
+
+    #[test]
+    fn test_mistral_preset() {
+        // Mistral should be OpenAI-compatible
+        let mistral = RoleMappingBuilder::mistral();
+        let openai = RoleMappingBuilder::openai();
+
+        assert_eq!(mistral.to_provider(StandardRole::User), openai.to_provider(StandardRole::User));
+        assert_eq!(mistral.to_provider(StandardRole::Assistant), openai.to_provider(StandardRole::Assistant));
+        assert_eq!(mistral.system_handling, openai.system_handling);
+    }
+
+    #[test]
+    fn test_role_mapping_serialization() {
+        let config = RoleMappingBuilder::google();
+
+        // Serialize to YAML
+        let yaml = serde_yaml::to_string(&config).unwrap();
+
+        // Deserialize back
+        let mut deserialized: RoleMappingConfig = serde_yaml::from_str(&yaml).unwrap();
+
+        // Rebuild reverse map after deserialization (skipped field)
+        deserialized.rebuild_reverse_map();
+
+        assert_eq!(config.to_provider(StandardRole::User), deserialized.to_provider(StandardRole::User));
+        assert_eq!(config.to_provider(StandardRole::Assistant), deserialized.to_provider(StandardRole::Assistant));
+        assert_eq!(config.system_handling, deserialized.system_handling);
+
+        // Verify reverse lookup works after rebuild
+        assert_eq!(deserialized.from_provider("model"), Some(StandardRole::Assistant));
+    }
+
+    #[test]
+    fn test_role_mapping_json_serialization() {
+        let config = RoleMappingBuilder::new()
+            .user("user")
+            .assistant("model")
+            .system_separate()
+            .build();
+
+        // Serialize to JSON
+        let json = serde_json::to_string(&config).unwrap();
+
+        // Deserialize back
+        let mut deserialized: RoleMappingConfig = serde_json::from_str(&json).unwrap();
+        deserialized.rebuild_reverse_map();
+
+        assert_eq!(config.to_provider(StandardRole::User), deserialized.to_provider(StandardRole::User));
+        assert_eq!(config.to_provider(StandardRole::Assistant), deserialized.to_provider(StandardRole::Assistant));
+        assert_eq!(config.system_handling, deserialized.system_handling);
+    }
+
+    #[test]
+    fn test_role_mapping_from_mappings() {
+        let mut mappings = HashMap::new();
+        mappings.insert(StandardRole::User, "human".to_string());
+        mappings.insert(StandardRole::Assistant, "bot".to_string());
+
+        let config = RoleMappingConfig::from_mappings(mappings);
+
+        assert_eq!(config.to_provider(StandardRole::User), "human");
+        assert_eq!(config.to_provider(StandardRole::Assistant), "bot");
+        assert_eq!(config.from_provider("human"), Some(StandardRole::User));
+        assert_eq!(config.from_provider("bot"), Some(StandardRole::Assistant));
+    }
+
+    #[test]
+    fn test_role_mapping_with_system_handling() {
+        let mut mappings = HashMap::new();
+        mappings.insert(StandardRole::User, "user".to_string());
+
+        let config = RoleMappingConfig::from_mappings(mappings)
+            .with_system_handling(SystemHandling::Separate);
+
+        assert!(config.handles_system_separately());
+    }
+
+    #[test]
+    fn test_role_mapping_mappings_accessor() {
+        let config = RoleMappingBuilder::new()
+            .user("user")
+            .assistant("model")
+            .build();
+
+        let mappings = config.mappings();
+        assert_eq!(mappings.len(), 2);
+        assert_eq!(mappings.get(&StandardRole::User), Some(&"user".to_string()));
+        assert_eq!(mappings.get(&StandardRole::Assistant), Some(&"model".to_string()));
+    }
+
+    #[test]
+    fn test_standard_role_serde() {
+        // Test serde rename_all = "snake_case"
+        let role = StandardRole::User;
+        let json = serde_json::to_string(&role).unwrap();
+        assert_eq!(json, "\"user\"");
+
+        let role = StandardRole::Assistant;
+        let json = serde_json::to_string(&role).unwrap();
+        assert_eq!(json, "\"assistant\"");
+
+        // Deserialize
+        let role: StandardRole = serde_json::from_str("\"system\"").unwrap();
+        assert_eq!(role, StandardRole::System);
+
+        let role: StandardRole = serde_json::from_str("\"tool\"").unwrap();
+        assert_eq!(role, StandardRole::Tool);
+    }
+
+    #[test]
+    fn test_system_handling_serde() {
+        let inline = SystemHandling::Inline;
+        let json = serde_json::to_string(&inline).unwrap();
+        assert_eq!(json, "\"inline\"");
+
+        let separate = SystemHandling::Separate;
+        let json = serde_json::to_string(&separate).unwrap();
+        assert_eq!(json, "\"separate\"");
+
+        // Deserialize
+        let handling: SystemHandling = serde_json::from_str("\"inline\"").unwrap();
+        assert_eq!(handling, SystemHandling::Inline);
+
+        let handling: SystemHandling = serde_json::from_str("\"separate\"").unwrap();
+        assert_eq!(handling, SystemHandling::Separate);
+    }
+
+    #[test]
+    fn test_system_handling_default() {
+        let handling = SystemHandling::default();
+        assert_eq!(handling, SystemHandling::Inline);
     }
 }
