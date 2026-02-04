@@ -1,7 +1,7 @@
-//! Plugin integration for substrate hub
+//! Plugin integration for Plexus RPC
 //!
 //! This module provides `CllientActivation`, a wrapper around `ModelRegistry`
-//! that implements the substrate `Activation` trait using the `hub-macro`.
+//! that implements the Plexus RPC `Activation` trait using the `hub-macro`.
 //!
 //! # Feature Flags
 //!
@@ -33,7 +33,7 @@ use std::sync::Arc;
 
 /// Activation wrapper for ModelRegistry
 ///
-/// Exposes ModelRegistry functionality as a substrate Activation plugin.
+/// Exposes ModelRegistry functionality as a Plexus RPC activation.
 #[derive(Clone)]
 pub struct CllientActivation {
     registry: Arc<ModelRegistry>,

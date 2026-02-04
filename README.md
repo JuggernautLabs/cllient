@@ -43,7 +43,7 @@ A config-driven LLM client library in Rust. Define providers and models in YAML 
 - **SSE streaming** - Real-time token streaming with provider-specific parsers
 - **Streaming JSON** - Emit valid JSON incrementally as tokens arrive
 - **339 model configs** - 97 direct integrations + 242 via OpenRouter
-- **Plugin system** - Expose as a substrate Activation for hub integration
+- **Plugin system** - Expose as a Plexus RPC activation for hub integration
 - **Query API** - Fluent filter builder for model discovery
 - **Validation** - Schema, cross-reference, and semantic config validation
 - **Registry export** - Single-call access to full registry for RPC/integrations
@@ -256,7 +256,7 @@ Then add model configs referencing this service in `config/family/`.
 
 ## Plugin System
 
-cllient can expose itself as a **substrate Activation** for integration with hub-based systems.
+cllient can expose itself as a **Plexus RPC activation** for integration with hub-based systems.
 
 ### Feature Flags
 
